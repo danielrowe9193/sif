@@ -16,6 +16,12 @@ class FileManagement:
     """Utilities for handling files gathered during the experiment."""
 
     @staticmethod
+    def make_directories():
+        """Creates data/ and plots/ directories if currently non-existant."""
+
+        ...
+
+    @staticmethod
     def convert_mwx_to_zip():
         """
         Method that converts mwx to zip files.

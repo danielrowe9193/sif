@@ -134,17 +134,15 @@ def parse_soundings(lines: list[str]) -> dict[pd.Timestamp, pd.DataFrame]:
     return soundings
 
 
-def soundings_to_xarray(soundings):
+def soundings_to_xarray(soundings: dict[pd.Timestamp, pd.DataFrame]) -> xr.Dataset:
     """
     Convert a dictionary of IGRA soundings into an xarray Dataset.
 
     Parameters
-    ----------
-    soundings : dict[pd.Timestamp, pd.DataFrame]
+        soundings : dict[pd.Timestamp, pd.DataFrame]. This is generated using parse_soundings.
 
     Returns
-    -------
-    xr.Dataset
+        xr.Dataset for each sounding sorted by timestamp.
     """
 
     # Sort chronologically
@@ -167,38 +165,39 @@ def soundings_to_xarray(soundings):
         "etime",
     ]
 
-    # Allocate arrays
+    # Initialize metadata arrays for profiles with NaN values. (e.g. pressure, temp)
     arrays = {
         var: np.full((ntime, max_levels), np.nan)
         for var in profile_vars
     }
 
-    # Metadata (one value per sounding)
+    # Initialize metadata with one value per sounding. (e.g. lat, lon, launch time)
     release_time = np.full(ntime, np.nan)
-    numlev = np.full(ntime, np.nan)
+    num_lev = np.full(ntime, np.nan)
+    lat = np.full(ntime, np.nan)
+    lon = np.full(ntime, np.nan)
 
     p_src = []
     np_src = []
 
-    lat = np.full(ntime, np.nan)
-    lon = np.full(ntime, np.nan)
-
-    # Fill arrays
+    # Loop through soundings to fill arrays.
     for i, time in enumerate(times):
 
         df = soundings[time]
 
         n = len(df)
 
+        # Fill the arrays.
         for var in profile_vars:
 
             if var in df.columns:
                 arrays[var][i, :n] = df[var].values
 
+        # Metadata from header.
         attrs = df.attrs
 
         release_time[i] = attrs["release_time"]
-        numlev[i] = attrs["numlev"]
+        num_lev[i] = attrs["numlev"]
 
         lat[i] = attrs["lat"]
         lon[i] = attrs["lon"]
@@ -216,7 +215,7 @@ def soundings_to_xarray(soundings):
             },
 
             "release_time": ("time", release_time),
-            "numlev": ("time", numlev),
+            "numlev": ("time", num_lev),
 
             "latitude": ("time", lat),
             "longitude": ("time", lon),

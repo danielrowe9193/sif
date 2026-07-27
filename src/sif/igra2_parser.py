@@ -6,8 +6,9 @@ import pandas as pd
 import xarray as xr
 
 
-def parse_header(line):
-    """Parse one IGRA header line."""
+def parse_header(line: list) -> dict:
+    """Parse one IGRA header line using the Header Record Format from
+    https://www.ncei.noaa.gov/data/integrated-global-radiosonde-archive/doc/igra2-data-format.txt."""
 
     return {
 
@@ -31,8 +32,9 @@ def parse_header(line):
     }
 
 
-def parse_level(line):
-    """Parse one IGRA profile line."""
+def parse_level(line: list) -> dict:
+    """Parse one IGRA profile line using the Header Record Format from
+    https://www.ncei.noaa.gov/data/integrated-global-radiosonde-archive/doc/igra2-data-format.txt."""
 
     return {
 
@@ -255,14 +257,14 @@ filename = "BBM00078954-data.txt.zip"
 zip_path = Path(__file__).parents[2] / DATA_DIR / filename
 
 
-with zipfile.ZipFile(zip_path, mode='r') as z:
+with zipfile.ZipFile(zip_path, mode='r') as zip_file:
 
-    text_files = [file for file in z.namelist() if file.endswith(".txt")]
+    text_files = [file for file in zip_file.namelist() if file.endswith(".txt")]
 
     if not text_files:
-        raise("No .txt files found in ZIP")
+        raise(f"No .txt files found in {zip_path.resolve().name}.")
 
-    with z.open(text_files[0]) as f:
+    with zip_file.open(text_files[0]) as f:
         lines = f.read().decode("ascii").splitlines()
 
 soundings = parse_soundings(lines)

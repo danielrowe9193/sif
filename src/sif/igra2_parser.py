@@ -110,9 +110,8 @@ def parse_soundings(lines: list[str]) -> dict[pd.Timestamp, pd.DataFrame]:
         df.replace([-9999, -8888], np.nan, inplace=True)
 
         # Convert units
-        df["pressure"] /= 100.0          # Pa -> hPa
-        df["temperature"] /= 10.0        # tenths C -> C
-        df["dpdp"] /= 10.0               # tenths C -> C
+        df["temperature"] /= 10.0 + 273.15       # tenths C -> K
+        df["dpdp"] /= 10.0 + 273.15              # tenths C -> K
         df["dewpoint"] = df["temperature"] - df["dpdp"]
         df["wind_speed"] /= 10.0         # tenths m/s -> m/s
 

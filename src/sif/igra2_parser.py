@@ -252,24 +252,30 @@ def soundings_to_xarray(soundings: dict[pd.Timestamp, pd.DataFrame]) -> xr.Datas
     return ds
 
 
+ROOT = Path(__file__).parents[2]
 DATA_DIR = Path("data")
+ZIP_DIR = ROOT / DATA_DIR
+
 filename = "BBM00078954-data.txt.zip"
-zip_path = Path(__file__).parents[2] / DATA_DIR / filename
+zip_file = ZIP_DIR / filename
 
 
-with zipfile.ZipFile(zip_path, mode='r') as zip_file:
+with zipfile.ZipFile(zip_file, mode='r') as zf:
 
-    text_files = [file for file in zip_file.namelist() if file.endswith(".txt")]
+    text_files = [file for file in zf.namelist() if file.endswith(".txt")]
 
     if not text_files:
-        raise(f"No .txt files found in {zip_path.resolve().name}.")
+        raise RuntimeError(f"No .txt files found in {ZIP_DIR.resolve().name}.")
 
-    with zip_file.open(text_files[0]) as f:
+    with zf.open(text_files[0]) as f:
         lines = f.read().decode("ascii").splitlines()
 
 soundings = parse_soundings(lines)
 
 ds = soundings_to_xarray(soundings)
-print(ds)
+print(ds, '\n')
 
-# ds.to_netcdf(filename.split('-')[0] + '.nc')
+output_file = filename.split('-')[0] + '.nc'
+ds.to_netcdf(ZIP_DIR / output_file)
+
+print(f"Wrote {output_file} to the directory {ZIP_DIR.resolve()}.")

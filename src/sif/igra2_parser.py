@@ -86,21 +86,22 @@ def parse_soundings(lines: list[str]) -> dict[pd.Timestamp, pd.DataFrame]:
 
     soundings = {}
 
-    i = 0
+    line_number = 0
 
-    while i < len(lines):
+    while line_number < len(lines):
 
-        if not lines[i].startswith("#"):
+        # Skip the headers.
+        if not lines[line_number].startswith("#"):
             i += 1
             continue
 
-        header = _parse_header(lines[i])
+        header = _parse_header(lines[line_number])
 
         profile = []
 
         for j in range(header["numlev"]):
 
-            profile.append(_parse_level(lines[i + j + 1]))
+            profile.append(_parse_level(lines[line_number + j + 1]))
 
         df = pd.DataFrame(profile)
 
@@ -128,7 +129,7 @@ def parse_soundings(lines: list[str]) -> dict[pd.Timestamp, pd.DataFrame]:
         # Save sounding
         soundings[dt] = df
 
-        i += header["numlev"] + 1
+        line_number += header["numlev"] + 1
 
     return soundings
 

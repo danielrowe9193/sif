@@ -6,7 +6,7 @@ import pandas as pd
 import xarray as xr
 
 
-def parse_header(line: list) -> dict:
+def _parse_header(line: list) -> dict:
     """Parse one IGRA header line using the Header Record Format from
     https://www.ncei.noaa.gov/data/integrated-global-radiosonde-archive/doc/igra2-data-format.txt."""
 
@@ -32,7 +32,7 @@ def parse_header(line: list) -> dict:
     }
 
 
-def parse_level(line: list) -> dict:
+def _parse_level(line: list) -> dict:
     """Parse one IGRA profile line using the Header Record Format from
     https://www.ncei.noaa.gov/data/integrated-global-radiosonde-archive/doc/igra2-data-format.txt."""
 
@@ -94,13 +94,13 @@ def parse_soundings(lines: list[str]) -> dict[pd.Timestamp, pd.DataFrame]:
             i += 1
             continue
 
-        header = parse_header(lines[i])
+        header = _parse_header(lines[i])
 
         profile = []
 
         for j in range(header["numlev"]):
 
-            profile.append(parse_level(lines[i + j + 1]))
+            profile.append(_parse_level(lines[i + j + 1]))
 
         df = pd.DataFrame(profile)
 

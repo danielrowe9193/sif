@@ -27,6 +27,7 @@ def parse_header(line):
 
         "lat": int(line[55:62]) / 10000,
         "lon": int(line[63:71]) / 10000,
+
     }
 
 

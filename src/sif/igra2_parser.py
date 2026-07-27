@@ -173,7 +173,7 @@ def soundings_to_xarray(soundings: dict[pd.Timestamp, pd.DataFrame]) -> xr.Datas
 
     # Initialize metadata with one value per sounding. (e.g. lat, lon, launch time)
     release_time = np.full(ntime, np.nan)
-    num_lev = np.full(ntime, np.nan)
+    numlev = np.full(ntime, np.nan)
     lat = np.full(ntime, np.nan)
     lon = np.full(ntime, np.nan)
 
@@ -197,7 +197,7 @@ def soundings_to_xarray(soundings: dict[pd.Timestamp, pd.DataFrame]) -> xr.Datas
         attrs = df.attrs
 
         release_time[i] = attrs["release_time"]
-        num_lev[i] = attrs["numlev"]
+        numlev[i] = attrs["numlev"]
 
         lat[i] = attrs["lat"]
         lon[i] = attrs["lon"]
@@ -215,7 +215,7 @@ def soundings_to_xarray(soundings: dict[pd.Timestamp, pd.DataFrame]) -> xr.Datas
             },
 
             "release_time": ("time", release_time),
-            "numlev": ("time", num_lev),
+            "numlev": ("time", numlev),
 
             "latitude": ("time", lat),
             "longitude": ("time", lon),

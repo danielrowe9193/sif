@@ -3,9 +3,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).parents[2]
 
-DATA_DIR = Path("data")
-
-ZIP_DIR = ROOT / DATA_DIR
+DATA_DIR = ROOT / Path("data")
 
 
 class Constants:

@@ -110,10 +110,10 @@ def parse_soundings(lines: list[str]) -> dict[pd.Timestamp, pd.DataFrame]:
         df.replace([-9999, -8888], np.nan, inplace=True)
 
         # Convert units
-        df["temperature"] /= 10.0 + 273.15       # tenths C -> K
-        df["dpdp"] /= 10.0 + 273.15              # tenths C -> K
+        df["temperature"] = df["temperature"] / 10.0 + 273.15       # tenths C -> K
+        df["dpdp"] /= 10.0                                          # tenths C -> C
         df["dewpoint"] = df["temperature"] - df["dpdp"]
-        df["wind_speed"] /= 10.0         # tenths m/s -> m/s
+        df["wind_speed"] /= 10.0                                    # tenths m/s -> m/s
 
         # Datetime for this sounding.
         dt = pd.Timestamp(
@@ -252,7 +252,7 @@ def soundings_to_xarray(soundings: dict[pd.Timestamp, pd.DataFrame]) -> xr.Datas
     return ds
 
 
-ROOT = Path(__file__).parents[2]
+ROOT = Path(__file__).resolve().parents[2]
 DATA_DIR = Path("data")
 ZIP_DIR = ROOT / DATA_DIR
 

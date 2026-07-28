@@ -5,11 +5,11 @@ import numpy as np
 from metpy.plots import SkewT
 import xarray as xr
 
-from config import ZIP_DIR
+from config import DATA_DIR
 
 
 filename = Path("BBM00078954.nc")
-data = ZIP_DIR / filename
+data = DATA_DIR / filename
 
 
 # Load the data.

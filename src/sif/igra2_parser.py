@@ -35,7 +35,7 @@ def _parse_header(line: list) -> dict:
 
 
 def _parse_level(line: list) -> dict:
-    """Parse one IGRA profile line using the Header Record Format from
+    """Parse one IGRA profile line using the Data Record Format from
     https://www.ncei.noaa.gov/data/integrated-global-radiosonde-archive/doc/igra2-data-format.txt."""
 
     return {
@@ -74,16 +74,14 @@ def parse_soundings(lines: list[str]) -> dict[pd.Timestamp, pd.DataFrame]:
     Parse an IGRA station file into a dictionary of soundings.
 
     Parameters
-    ----------
-    lines : list[str]
-        List of lines from an IGRA station file.
+        lines : list[str]
+            List of lines from an IGRA station file.
 
     Returns
-    -------
-    dict[pandas.Timestamp, pandas.DataFrame]
-        Dictionary whose keys are launch datetimes and whose values are
-        DataFrames containing the sounding profile. The header metadata
-        are stored in each DataFrame's ``attrs`` dictionary.
+        dict[pandas.Timestamp, pandas.DataFrame]
+            Dictionary whose keys are launch datetimes and whose values are
+            DataFrames containing the sounding profile. The header metadata
+            are stored in each DataFrame's ``attrs`` dictionary.
     """
 
     soundings = {}

@@ -5,6 +5,8 @@ import numpy as np
 import pandas as pd
 import xarray as xr
 
+from src.sif.config import DATA_DIR
+
 
 def _parse_header(line: list) -> dict:
     """Parse one IGRA header line using the Header Record Format from
@@ -252,12 +254,8 @@ def soundings_to_xarray(soundings: dict[pd.Timestamp, pd.DataFrame]) -> xr.Datas
     return ds
 
 
-ROOT = Path(__file__).resolve().parents[2]
-DATA_DIR = Path("data")
-ZIP_DIR = ROOT / DATA_DIR
-
 filename = "BBM00078954-data.txt.zip"
-zip_file = ZIP_DIR / filename
+zip_file = DATA_DIR / filename
 
 
 with zipfile.ZipFile(zip_file, mode='r') as zf:
@@ -265,7 +263,7 @@ with zipfile.ZipFile(zip_file, mode='r') as zf:
     text_files = [file for file in zf.namelist() if file.endswith(".txt")]
 
     if not text_files:
-        raise RuntimeError(f"No .txt files found in {ZIP_DIR.resolve().name}.")
+        raise RuntimeError(f"No .txt files found in {DATA_DIR.resolve().name}.")
 
     with zf.open(text_files[0]) as f:
         lines = f.read().decode("ascii").splitlines()
@@ -276,6 +274,6 @@ ds = soundings_to_xarray(soundings)
 print(ds, '\n')
 
 output_file = filename.split('-')[0] + '.nc'
-ds.to_netcdf(ZIP_DIR / output_file)
+ds.to_netcdf(DATA_DIR / output_file)
 
-print(f"Wrote {output_file} to the directory {ZIP_DIR.resolve()}.")
+print(f"Wrote {output_file} to the directory {DATA_DIR.resolve()}.")

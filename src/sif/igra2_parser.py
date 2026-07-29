@@ -631,8 +631,8 @@ drvd_lines = decode_igra_zipfile(zip_drvd_file)
 soundings = parse_soundings(data_lines)
 ds_data = soundings_to_xarray(soundings)
 
-    with zf.open(text_files[0]) as f:
-        lines = f.read().decode("ascii").splitlines()
+derived_soundings = parse_derived_soundings(drvd_lines)
+ds_drvd = derived_soundings_to_xarray(derived_soundings)
 
 soundings = parse_soundings(lines)
 

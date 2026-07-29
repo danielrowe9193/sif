@@ -110,6 +110,42 @@ def _parse_derived_header(line: list) -> dict:
     }
 
 
+def _parse_derived_level(line: str) -> dict:
+    """Parse one IGRA derived profile line using the Data Record Format from
+    https://www.ncei.noaa.gov/data/integrated-global-radiosonde-archive/doc/igra2-derived-format.txt."""
+
+    return {
+        "pressure": int(line[0:7]),
+
+        "reported_geopotential_height": int(line[8:15]),
+        "calculated_geopotential_height": int(line[16:23]),
+
+        "temperature": int(line[24:31]),
+        "temperature_gradient": int(line[32:39]),
+
+        "potential_temperature": int(line[40:47]),
+        "potential_temperature_gradient": int(line[48:55]),
+
+        "virtual_temperature": int(line[56:63]),
+        "virtual_potential_temperature": int(line[64:71]),
+
+        "vapor_pressure": int(line[72:79]),
+        "saturation_vapor_pressure": int(line[80:87]),
+
+        "reported_relative_humidity": int(line[88:95]),
+        "calculated_relative_humidity": int(line[96:103]),
+        "relative_humidity_gradient": int(line[104:111]),
+
+        "u_wind": int(line[112:119]),
+        "u_wind_gradient": int(line[120:127]),
+
+        "v_wind": int(line[128:135]),
+        "v_wind_gradient": int(line[136:143]),
+
+        "refractive_index": int(line[144:151]),
+    }
+
+
 # Parse the entire file.
 def parse_soundings(lines: list[str]) -> dict[pd.Timestamp, pd.DataFrame]:
     """

@@ -1,4 +1,3 @@
-from pathlib import Path
 import zipfile
 
 import numpy as np

@@ -628,9 +628,8 @@ zip_drvd_file = DATA_DIR / drvd_file
 data_lines = decode_igra_zipfile(zip_data_file)
 drvd_lines = decode_igra_zipfile(zip_drvd_file)
 
-
-    if not text_files:
-        raise RuntimeError(f"No .txt files found in {DATA_DIR.resolve().name}.")
+soundings = parse_soundings(data_lines)
+ds_data = soundings_to_xarray(soundings)
 
     with zf.open(text_files[0]) as f:
         lines = f.read().decode("ascii").splitlines()

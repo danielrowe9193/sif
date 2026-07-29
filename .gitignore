@@ -1,0 +1,6 @@
+# Ignore data folder.
+/sif/data
+
+# Ignore data file types anywhere.
+*.nc
+*.zip

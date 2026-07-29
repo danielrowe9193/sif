@@ -634,9 +634,7 @@ ds_data = soundings_to_xarray(soundings)
 derived_soundings = parse_derived_soundings(drvd_lines)
 ds_drvd = derived_soundings_to_xarray(derived_soundings)
 
-soundings = parse_soundings(lines)
-
-ds = soundings_to_xarray(soundings)
+ds = merge_sounding_datasets(ds_data, ds_drvd)
 print(ds, '\n')
 
 output_file = filename.split('-')[0] + '.nc'

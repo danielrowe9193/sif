@@ -628,13 +628,6 @@ zip_drvd_file = DATA_DIR / drvd_file
 data_lines = decode_igra_zipfile(zip_data_file)
 drvd_lines = decode_igra_zipfile(zip_drvd_file)
 
-filename = "BBM00078954-data.txt.zip"
-zip_file = DATA_DIR / filename
-
-
-with zipfile.ZipFile(zip_file, mode='r') as zf:
-
-    text_files = [file for file in zf.namelist() if file.endswith(".txt")]
 
     if not text_files:
         raise RuntimeError(f"No .txt files found in {DATA_DIR.resolve().name}.")

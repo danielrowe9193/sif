@@ -1,3 +1,4 @@
+from pathlib import Path
 import zipfile
 
 import numpy as np
@@ -146,7 +147,6 @@ def _parse_derived_level(line: str) -> dict:
     }
 
 
-# Parse the entire file.
 def parse_soundings(lines: list[str]) -> dict[pd.Timestamp, pd.DataFrame]:
     """
     Parse an IGRA station file into a dictionary of soundings.
@@ -599,13 +599,14 @@ def derived_soundings_to_xarray(soundings: dict[pd.Timestamp, pd.DataFrame]) -> 
 def merge_sounding_datasets(
         obs_ds: xr.Dataset,
         derived_ds: xr.Dataset
-) -> xr.Dataset:
+)\
+        -> xr.Dataset:
     """Merges the observed profiles dataset and the derived profiles dataset into a single dataset."""
     return xr.merge([obs_ds, derived_ds], compat="override")
 
 
 def decode_igra_zipfile(zip_path: Path) -> list[str]:
-    """Return the decoded line in the first text file in the IGRA2 zipfile."""
+    """Return the decoded lines in the first text file in the IGRA2 zipfile."""
     with zipfile.ZipFile(zip_path, mode='r') as zf:
 
         text_files = [file for file in zf.namelist() if file.endswith(".txt")]
@@ -619,25 +620,31 @@ def decode_igra_zipfile(zip_path: Path) -> list[str]:
         return lines
 
 
+# File names for the data file and the derived sounding files.
 data_file = "BBM00078954-data.txt.zip"
 drvd_file = "BBM00078954-drvd.txt.zip"
 
+# Locate the data and the derived sounding files.
 zip_data_file = DATA_DIR / data_file
 zip_drvd_file = DATA_DIR / drvd_file
 
+# Decode the data and the derived sounding files into a list of lines.
 data_lines = decode_igra_zipfile(zip_data_file)
 drvd_lines = decode_igra_zipfile(zip_drvd_file)
 
+# Parse the list of data lines into a dictionary of Timestamp and DataFrames.
 soundings = parse_soundings(data_lines)
 ds_data = soundings_to_xarray(soundings)
 
+# Parse the list of derived lines into a dictionary of Timestamp and DataFrames.
 derived_soundings = parse_derived_soundings(drvd_lines)
 ds_drvd = derived_soundings_to_xarray(derived_soundings)
 
+# Merge the data and derived datasets.
 ds = merge_sounding_datasets(ds_data, ds_drvd)
-print(ds, '\n')
 
-output_file = filename.split('-')[0] + '.nc'
+# Write the output file to the data directory.
+output_file = data_file.split('-')[0] + '3.nc'
 ds.to_netcdf(DATA_DIR / output_file)
 
 print(f"Wrote {output_file} to the directory {DATA_DIR.resolve()}.")

@@ -622,6 +622,11 @@ def decode_igra_zipfile(zip_path: Path) -> list[str]:
 data_file = "BBM00078954-data.txt.zip"
 drvd_file = "BBM00078954-drvd.txt.zip"
 
+zip_data_file = DATA_DIR / data_file
+zip_drvd_file = DATA_DIR / drvd_file
+
+data_lines = decode_igra_zipfile(zip_data_file)
+drvd_lines = decode_igra_zipfile(zip_drvd_file)
 
 filename = "BBM00078954-data.txt.zip"
 zip_file = DATA_DIR / filename

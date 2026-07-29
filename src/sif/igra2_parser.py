@@ -212,6 +212,85 @@ def parse_soundings(lines: list[str]) -> dict[pd.Timestamp, pd.DataFrame]:
     return soundings
 
 
+def parse_derived_soundings(lines: list[str]) -> dict[pd.Timestamp, pd.DataFrame]:
+    """
+    Parse an IGRA station file into a dictionary of soundings.
+
+    Parameters
+        lines : list[str]
+            List of lines from an IGRA station file.
+
+    Returns
+        dict[pandas.Timestamp, pandas.DataFrame]
+            Dictionary whose keys are launch datetimes and whose values are
+            DataFrames containing the sounding profile. The header metadata
+            are stored in each DataFrame's ``attrs`` dictionary.
+    """
+
+    soundings = {}
+
+    line_number = 0
+
+    # Loop through each profile associated with each heading.
+    while line_number < len(lines):
+
+        # Skip if line is not a header.
+        if not lines[line_number].startswith("#"):
+            line_number += 1
+            continue
+
+        header = _parse_derived_header(lines[line_number])
+
+        profile = []
+
+        for sounding_level in range(header["numlev"]):
+
+            profile.append(_parse_derived_level(lines[line_number + sounding_level + 1]))
+
+        df = pd.DataFrame(profile)
+
+        # Replace IGRA missing values with NaN.
+        df.replace(-99999, np.nan, inplace=True)
+
+        # Convert units.
+        df["temperature"] /= 10.0
+        df["temperature_gradient"] /= 10.0              # K/km
+
+        df["potential_temperature"] /= 10.0
+        df["potential_temperature_gradient"] /= 10.0    # K/km
+
+        df["virtual_temperature"] /= 10.0
+        df["virtual_potential_temperature"] /= 10.0     # K/km
+
+        df["vapor_pressure"] /= 10.0
+        df["saturation_vapor_pressure"] /= 10.0
+
+        df["reported_relative_humidity"] /= 10.0
+        df["calculated_relative_humidity"] /= 10.0
+        df["relative_humidity_gradient"] /= 10          # %/km
+
+        df["u_wind"] /= 10.0
+        df["u_wind_gradient"] /= 10                     # m/s/km
+
+        df["v_wind"] /= 10.0
+        df["v_wind_gradient"] /= 10                     # m/s/km
+
+        dt = pd.Timestamp(
+            year=header["year"],
+            month=header["month"],
+            day=header["day"],
+            hour=header["hour"],
+        )
+
+        df.attrs = header
+
+        soundings[dt] = df
+
+        line_number += header["numlev"] + 1
+
+    return soundings
+
+
 def soundings_to_xarray(soundings: dict[pd.Timestamp, pd.DataFrame]) -> xr.Dataset:
     """
     Convert a dictionary of IGRA soundings into an xarray Dataset.

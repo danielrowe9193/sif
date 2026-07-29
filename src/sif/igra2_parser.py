@@ -619,6 +619,8 @@ def decode_igra_zipfile(zip_path: Path) -> list[str]:
         return lines
 
 
+data_file = "BBM00078954-data.txt.zip"
+drvd_file = "BBM00078954-drvd.txt.zip"
 
 
 filename = "BBM00078954-data.txt.zip"

@@ -67,6 +67,49 @@ def _parse_level(line: list) -> dict:
     }
 
 
+def _parse_derived_header(line: list) -> dict:
+    """Parse one IGRA derived index using the Header Record Format from
+    https://www.ncei.noaa.gov/data/integrated-global-radiosonde-archive/doc/igra2-derived-format.txt."""
+
+    return {
+        "station": line[1:12].strip(),
+
+        "year": int(line[13:17]),
+        "month": int(line[18:20]),
+        "day": int(line[21:23]),
+        "hour": int(line[24:26]),
+
+        "numlev": int(line[31:36]),
+
+        "pw": int(line[37:43]),
+        "inversion_pressure": int(line[43:49]),
+        "inversion_height": int(line[49:55]),
+
+        "mixed_layer_pressure": int(line[55:61]),
+        "mixed_layer_height": int(line[61:67]),
+
+        "freezing_pressure": int(line[67:73]),
+        "freezing_height": int(line[73:79]),
+
+        "lcl_pressure": int(line[79:85]),
+        "lcl_height": int(line[85:91]),
+
+        "lfc_pressure": int(line[91:97]),
+        "lfc_height": int(line[97:103]),
+
+        "lnb_pressure": int(line[103:109]),
+        "lnb_height": int(line[109:115]),
+
+        "lifted_index": int(line[115:121]),
+        "showalter_index": int(line[121:127]),
+        "k_index": int(line[127:133]),
+        "total_totals_index": int(line[133:139]),
+
+        "cape": int(line[139:145]),
+        "cin": int(line[145:151]),
+    }
+
+
 # Parse the entire file.
 def parse_soundings(lines: list[str]) -> dict[pd.Timestamp, pd.DataFrame]:
     """

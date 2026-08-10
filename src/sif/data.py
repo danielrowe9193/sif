@@ -1,10 +1,49 @@
-# libraries
-
-import zipfile
-import xml.etree.ElementTree as ET
-from pathlib import Path
 import numpy as np
+import xml.etree.ElementTree as ET
+import zipfile
+
 from netCDF4 import Dataset
+from pathlib import Path
+
+
+class Radiosonde:
+    """
+    Object preparing a singular radiosonde from .mwx data.
+    """
+
+    def __init__(self, storage_dir: str | Path, filename: str):
+        """
+        Provide storage directory and filename for raw radiosonde data.
+        :param storage_dir: The directory in which the raw radiosonde data is stored.
+        :param filename: The filename of the raw radiosonde data. Expects the extension to be included.
+        """
+
+        self.storage_dir = Path(storage_dir)
+        self.filename = filename
+        self.filepath = self.storage_dir / self.filename
+
+        self.filename_nc = 'clean.nc'
+        self.filepath_nc = self.storage_dir / self.filename_nc
+
+    def extract_mwx(self, mwx_filepath: str | Path, xml_file_name: str) -> Path:
+        """
+        Extracts .xml from a given .mwx file and stores it at a given output directory
+        :param mwx_filepath: The filepath on which the .mwx file is stored.
+        :param xml_file_name: The name of the .xml file, including the extension.
+        :return: Filepath of .xml extracted from  .mwx file.
+        """
+
+        with zipfile.ZipFile(mwx_filepath, 'r') as z:
+            z.extractall(self.storage_dir)
+
+        return self.storage_dir / xml_file_name
+
+    @staticmethod
+    def print_tree(element, level=0):
+        print("    " * level + element.tag)
+        for child in element:
+            print_tree(child, level + 1)
+
 
 # find the path file to data folder
 BASE_DIR = Path(__file__).resolve().parent
@@ -18,7 +57,7 @@ mwx_file = DATA_DIR / filename
 
 nc_file = "clean.nc"
 
-# path for output 
+# path for output
 output_path = BASE_DIR / "data" / "temp"
 output_path.mkdir(parents=True, exist_ok=True)
 
@@ -87,7 +126,6 @@ def make_netcdf(tags, nc_file):
     p.units = "hPa"
     t.units = "degC"
     rh.units = "%"
-
 
     # nc.title = "Converted data"
 

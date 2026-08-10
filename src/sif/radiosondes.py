@@ -5,19 +5,39 @@ import xml.etree.ElementTree as ET
 import zipfile
 
 from pathlib import Path
+from utils import FileManagement
 
 
 class Radiosonde:
     """
-    Object preparing a singular radiosonde from .mwx data.
+    Prepare and process a single radiosonde dataset from MWX-format input.
+
+    This class extracts XML files contained within a `.mwx` archive and
+    constructs NETCDF‑compliant datasets containing radiosonde measurements.
     """
 
-    def __init__(self, storage_dir: str | Path, filename: str, extract_to: str | Path):
+    def __init__(
+            self,
+            storage_dir: str | Path = FileManagement.DATA_DIR,
+            filename: str = None,
+            extract_to: str | Path = FileManagement.DATA_DIR / 'radiosonde/'
+    ):
         """
-        Provide storage directory and filename for raw radiosonde data.
-        :param storage_dir: The directory in which the raw radiosonde data is stored.
-        :param filename: The filename of the raw radiosonde data. Expects the extension to be included.
-        :param extract_to: The directory to extract the files to.
+        Initialize a Radiosonde instance.
+
+        Parameters
+        ----------
+        storage_dir : str or Path
+            Directory containing the raw `.mwx` radiosonde file. Defaults to data directory.
+        filename : str
+            Name of the `.mwx` file, including its extension.
+        extract_to : str or Path
+            Directory where extracted XML files will be written.
+
+        Notes
+        -----
+        The constructor also defines default output filenames for processed
+        NETCDF files.
         """
 
         self.storage_dir = Path(storage_dir)
@@ -30,8 +50,14 @@ class Radiosonde:
 
     def extract_mwx(self) -> None:
         """
-        Extracts .xml from a given .mwx file to an input directory.
-        :return: None.
+        Extract XML files from the `.mwx` archive.
+
+        The `.mwx` file is treated as a ZIP archive. All contents are extracted
+        into the directory specified by `extract_to`.
+
+        Returns
+        -------
+        None
         """
 
         extraction_dir = Path(self.extract_to)
@@ -44,9 +70,18 @@ class Radiosonde:
 
     def get_tree_from_xml(self, xml_filename: str) -> ET:
         """
-        Extract the tree from the .xml file, through a parsing method.
-        :param xml_filename: The name of the xml file to be parsed.
-        :return: An element tree.
+        Parse an XML file and return its element tree.
+
+        Parameters
+        ----------
+        xml_filename : str
+            Name of the XML file to parse. The file must exist inside the
+            extraction directory.
+
+        Returns
+        -------
+        xml.etree.ElementTree.ElementTree
+            Parsed XML element tree.
         """
 
         xml_filepath = self.extract_to / xml_filename
@@ -55,19 +90,27 @@ class Radiosonde:
 
     def build_std_pressure_lvl_radiosonde(self):
         """
-        Constructs a dataset containing radiosonde variables on standard pressure values.
-        :return: Dataset containing radiosonde variables.
+        Construct a dataset of radiosonde variables on standard pressure levels.
+
+        The method reads `StdPressureLevels.xml`, extracts all rows, and builds
+        an xarray dataset indexed by geometric height.
+
+        Returns
+        -------
+        xarray.Dataset
+            Dataset containing radiosonde variables on standard pressure levels.
         """
 
         root = self.get_tree_from_xml("StdPressureLevels.xml").getroot()
 
         data = [
             {
-                "RadioRxTimePk": float(row.get("RadioRxTimePk")),
+                "RadioRxTimePk": row.get("RadioRxTimePk"),
                 "time": row.get("DataSrvTime"),
+                'height': float(row.get("Height")),
                 "p": float(row.get("PressurePk")),
                 'h': float(row.get("Height")),
-                "t": float(row.get("Temperature")),
+                "ta": float(row.get("Temperature")),
                 "rh": float(row.get("Humidity")),
                 "wdir": float(row.get("WindDirection")),
                 "wspeed": float(row.get("WindSpeed")),
@@ -76,7 +119,73 @@ class Radiosonde:
         ]
 
         df = pd.DataFrame(data)
-        print(df.head())
+
+        df = df.set_index('height')
+
+        ds = df.to_xarray()
+
+        ds = ds.sortby('height')
+
+        print(ds)
+
+        return ds
+
+    def build_radiosonde(self):
+        """
+        Construct a radiosonde dataset from synchronized PTU (pressure,
+        temperature, humidity) data.
+
+        The method reads `SynchronizedSoundingData.xml`, extracts all rows, and
+        builds an xarray dataset indexed by height.
+
+        Returns
+        -------
+        xarray.Dataset
+            Dataset containing PTU‑derived radiosonde variables.
+        """
+
+        root = self.get_tree_from_xml(xml_filename="SynchronizedSoundingData.xml")
+
+        data = [
+            {
+                'altitude': float(row.get('Altitude')),
+                'height': float(row.get('Height')),
+                'geometric_height': float(row.get('GeometricHeight')),
+                'time': np.datetime64(row.get('DataSrvTime')),
+                'p': float(row.get('Pressure')),
+                'ta': float(row.get('Temperature')),
+                'rh': float(row.get('Humidity')),
+                'wdir': float(row.get('WindDir')),
+                'wspeed': float(row.get('WindSpeed')),
+                'u': float(row.get('WindEast')),
+                'v': float(row.get('WindNorth')),
+                'lat': float(row.get('Latitude')),
+                'lon': float(row.get('Longitude')),
+            }
+            for row in root.findall("Row")
+        ]
+
+        df = pd.DataFrame(data)
+
+        df = df.set_index('height')
+
+        ds = df.to_xarray()
+
+        ds = ds.sortby('height')
+
+        print(ds)
+
+        return ds
+
+    def summarize(self):
+        """
+        Prints the datasets that were created to provide a summary of the radiosondes.
+        :return: None
+        """
+
+        print(
+            f"{self.build_std_pressure_lvl_radiosonde()}\n\n{self.build_radiosonde()}"
+        )
 
     def print_tree(self, root, level=0):
         print("    " * level + root.tag)

@@ -1,26 +1,37 @@
-import radiosondes
-import pandas as pd
+import matplotlib.pyplot as plt
 
-test_radiosonde = radiosondes.Radiosonde(
-    storage_dir="../../data/",
+from plot import RadiosondePlotter
+from radiosondes import Radiosonde
+
+test_radiosonde = Radiosonde(
+    storage_dir='../../data',
     filename="RS_TestData_Westermarkelsdorf_20220825_131825.mwx",
     extract_to="../../data/test_extract/"
 )
 test_radiosonde.extract_mwx()
+ds_ptu = test_radiosonde.build_radiosonde()
+test_radiosonde.summarize()
 
-root = test_radiosonde.get_tree_from_xml("RawPtu.xml").getroot()
+plotter = RadiosondePlotter(test_radiosonde)
+plotter.plot_variable()
 
-data = [
-    {
-        "RadioRxTimePk": float(row.get("RadioRxTimePk")),
-        "time": row.get("DataSrvTime"),
-        "p": float(row.get("Pressure")),
-        "t": float(row.get("Temperature")),
-        "rh1": float(row.get("Humidity1")),
-        "rh2": float(row.get("Humidity2"))
-    }
-    for row in root.findall("Row")
-]
+fig, axes = plt.subplots(ncols=2)
+ax1, ax2 = axes.flatten()
 
-df = pd.DataFrame(data)
-print(df.head())
+ax1.plot(
+    ds_ptu['ta'],
+    ds_ptu['p']
+)
+ax1.invert_yaxis()
+ax1.set_yscale("log")
+
+ax2.plot(
+    ds_ptu['rh'],
+    ds_ptu['p']
+)
+ax2.set_yscale("log")
+ax2.invert_yaxis()
+ax2.set_yticks([1000, 850, 700, 500, 250, 100, 30])
+ax2.set_yticklabels(["1000", "850", "700", "500", "250", "100", "30"])
+
+plt.show()

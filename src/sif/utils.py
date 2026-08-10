@@ -15,6 +15,12 @@ class PlotUtils:
 class FileManagement:
     """Utilities for handling files gathered during the experiment."""
 
+    PACKAGE_DIR = pathlib.Path(__file__).resolve().parent
+    PROJECT_DIR = PACKAGE_DIR.parent.parent
+
+    DATA_DIR = PROJECT_DIR / 'data/'
+    PLOT_DIR = PROJECT_DIR / 'plots/'
+
     @staticmethod
     def make_directories():
         """Creates data/ and plots/ directories if currently non-existant."""

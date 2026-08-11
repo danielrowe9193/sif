@@ -19,35 +19,25 @@ class Radiosonde:
 
     def __init__(
         self,
-        storage_dir: str | Path = FileManagement.DATA_DIR,
-        filename: str = None,
-        extract_to: str | Path = FileManagement.DATA_DIR / "radiosonde/"
+        filepath: str,
     ):
         """
         Initialize a Radiosonde instance.
 
         Parameters
         ----------
-        storage_dir : str or Path, optional
-            Directory containing the raw `.mwx` radiosonde file. Defaults to
-            the project's data directory.
-        filename : str, optional
-            Name of the `.mwx` file, including its extension.
-        extract_to : str or Path, optional
-            Directory where extracted XML files will be written.
+        filepath : str
 
         Notes
         -----
         The constructor also defines default output filenames for processed
         NETCDF files.
         """
-        self.storage_dir = Path(storage_dir)
-        self.filename = filename
-        self.filepath = self.storage_dir / self.filename
-        self.extract_to = Path(extract_to)
+        self.filepath = Path(filepath)
+        self.directory = self.filepath.parent / self.filepath.stem
+        self.directory.mkdir(exist_ok=True)
 
-        self.filename_nc = "clean.nc"
-        self.filepath_nc = self.storage_dir / self.filename_nc
+
 
     def extract_mwx(self) -> None:
         """
@@ -60,11 +50,11 @@ class Radiosonde:
         -------
         None
         """
-        extraction_dir = Path(self.extract_to)
+        extraction_dir = Path(self.directory)
         extraction_dir.mkdir(parents=True, exist_ok=True)
 
         with zipfile.ZipFile(self.filepath, "r") as z:
-            z.extractall(self.extract_to)
+            z.extractall(self.directory)
 
         return None
 
@@ -83,7 +73,7 @@ class Radiosonde:
         xml.etree.ElementTree.ElementTree
             Parsed XML element tree.
         """
-        xml_filepath = self.extract_to / xml_filename
+        xml_filepath = self.directory / xml_filename
         return ET.parse(xml_filepath)
 
     def build_std_pressure_lvl_radiosonde(self) -> xr.Dataset:
@@ -123,7 +113,7 @@ class Radiosonde:
 
         return ds
 
-    def build_radiosonde(self) -> DataTree:
+    def build_radiosonde(self) -> None:
         """
         Construct a radiosonde dataset from synchronized PTU and stability index data.
 
@@ -132,10 +122,11 @@ class Radiosonde:
         Stability indices are merged into the same dataset under a shared
         `sounding_id` dimension.
 
+        Stores the radiosonde data as a `.nc` file with the same name as the `.mwx` file.
+
         Returns
         -------
-        xarray.Dataset
-            Dataset containing PTU‑derived radiosonde variables and stability indices.
+        None
         """
         root_sounding_data = self.get_tree_from_xml("SynchronizedSoundingData.xml")
         root_stability_index = self.get_tree_from_xml("StabilityIndex.xml")
@@ -200,7 +191,9 @@ class Radiosonde:
 
         radiosonde = xr.merge([sounding_ds, stability_index_ds])
 
-        return radiosonde
+        radiosonde.to_netcdf(FileManagement.DATA_DIR / f"{self.filepath.stem}.nc")
+
+        return None
 
     def summarize(self) -> None:
         """
@@ -217,3 +210,14 @@ class Radiosonde:
             f"{self.build_std_pressure_lvl_radiosonde()}\n\n"
             f"{self.build_radiosonde()}"
         )
+
+
+class Radiosondes:
+    """
+    Process multiple radiosondes from a directory and generate a dataset containing all sondes.
+
+    This class builds on the Radiosonde method, this time extract `.mwx` files from a directory then
+    processing individual radiosondes and finally concatinating into a single dataset.
+    """
+
+    ...

@@ -1,10 +1,12 @@
 import pathlib
 import zipfile
 
+import numpy as np
+
 
 class CalcUtils:
     """Utilities for calculations during the experiment."""
-    ...
+
 
 
 class PlotUtils:

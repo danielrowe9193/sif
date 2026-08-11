@@ -1,6 +1,12 @@
 # Ignore data folder.
 /sif/data
 
+# Ignore data folder.
+/sif/plots
+
 # Ignore data file types anywhere.
 *.nc
 *.zip
+*.xml
+*.mwx
+*.png

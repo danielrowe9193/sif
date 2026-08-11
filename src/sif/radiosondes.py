@@ -4,9 +4,10 @@ import xarray as xr
 import xml.etree.ElementTree as ET
 import zipfile
 
+from metpy.calc import dewpoint_from_relative_humidity
+from metpy.units import units
 from pathlib import Path
 from utils import FileManagement
-from xarray import DataTree
 
 
 class Radiosonde:
@@ -36,8 +37,6 @@ class Radiosonde:
         self.filepath = Path(filepath)
         self.directory = self.filepath.parent / self.filepath.stem
         self.directory.mkdir(exist_ok=True)
-
-
 
     def extract_mwx(self) -> None:
         """
@@ -190,6 +189,11 @@ class Radiosonde:
         )
 
         radiosonde = xr.merge([sounding_ds, stability_index_ds])
+
+        radiosonde['td'] = dewpoint_from_relative_humidity(
+            temperature=radiosonde['ta'].data * units.degK,
+            relative_humidity=radiosonde['rh'].data * units.percent
+        )
 
         radiosonde.to_netcdf(FileManagement.DATA_DIR / f"{self.filepath.stem}.nc")
 

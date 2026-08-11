@@ -1,6 +1,6 @@
 import matplotlib.pyplot as plt
+import xarray as xr
 
-from radiosondes import Radiosonde
 from utils import FileManagement
 
 
@@ -9,15 +9,15 @@ class RadiosondePlotter:
     Utilities for plotting data from Radiosonde instance.
     """
 
-    def __init__(self, radiosonde: Radiosonde):
+    def __init__(self, filepath:  str):
         """
         Initialise the plotter with radiosonde data.
-        :param radiosonde: The radiosonde data to be plotted, of type Radiosonde.
+        :param filepath: The path at which radiosonde data is stored.
         """
 
-        self.radiosonde = radiosonde
+        self.filepath = filepath
 
-        self.radiosonde_ds = self.radiosonde.build_radiosonde()
+        self.data = xr.open_dataset(self.filepath)
 
     def plot_variable(self, function_of: str = 'height', variable: str = 'ta'):
 
@@ -26,8 +26,8 @@ class RadiosondePlotter:
         ax.set_title(f"Profile of {variable} with {function_of}")
 
         ax.plot(
-            self.radiosonde_ds[variable],
-            self.radiosonde_ds[function_of],
+            self.data[variable],
+            self.data[function_of],
             color='k'
         )
 

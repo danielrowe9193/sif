@@ -173,6 +173,11 @@ class Radiosonde:
             .expand_dims(sounding_id=[sounding_id])
         )
 
+        sounding_ds['td'] = dewpoint_from_relative_humidity(
+            temperature=sounding_ds['ta'] * units.degK,
+            relative_humidity=sounding_ds['rh'] * units.percent
+        )
+
         stability_index_df = pd.DataFrame(stability_index_data)
         stability_index_df = (
             stability_index_df.drop(columns="sounding_id")
@@ -189,11 +194,6 @@ class Radiosonde:
         )
 
         radiosonde = xr.merge([sounding_ds, stability_index_ds])
-
-        radiosonde['td'] = dewpoint_from_relative_humidity(
-            temperature=radiosonde['ta'].data * units.degK,
-            relative_humidity=radiosonde['rh'].data * units.percent
-        )
 
         radiosonde.to_netcdf(FileManagement.DATA_DIR / f"{self.filepath.stem}.nc")
 

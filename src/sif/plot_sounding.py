@@ -8,7 +8,7 @@ import xarray as xr
 from config import DATA_DIR
 
 
-filename = Path("BBM00078954.nc")
+filename = Path("BBM000789543.nc")
 data = DATA_DIR / filename
 
 

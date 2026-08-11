@@ -13,7 +13,6 @@ def _parse_header(line: list) -> dict:
     https://www.ncei.noaa.gov/data/integrated-global-radiosonde-archive/doc/igra2-data-format.txt."""
 
     return {
-
         "station": line[1:12].strip(),
 
         "year": int(line[13:17]),
@@ -30,7 +29,6 @@ def _parse_header(line: list) -> dict:
 
         "lat": int(line[55:62]) / 10000,
         "lon": int(line[63:71]) / 10000,
-
     }
 
 
@@ -39,7 +37,6 @@ def _parse_level(line: list) -> dict:
     https://www.ncei.noaa.gov/data/integrated-global-radiosonde-archive/doc/igra2-data-format.txt."""
 
     return {
-
         "lvltyp1": int(line[0]),
         "lvltyp2": int(line[1]),
 
@@ -64,7 +61,6 @@ def _parse_level(line: list) -> dict:
         "wind_dir": int(line[40:45]),
 
         "wind_speed": int(line[46:51]),
-
     }
 
 
@@ -85,29 +81,30 @@ def _parse_derived_header(line: list) -> dict:
         "pw": int(line[37:43]),
         "inversion_pressure": int(line[43:49]),
         "inversion_height": int(line[49:55]),
+        "inversion_temperature_difference": int(line[55:61]),
 
-        "mixed_layer_pressure": int(line[55:61]),
-        "mixed_layer_height": int(line[61:67]),
+        "mixed_layer_pressure": int(line[61:67]),
+        "mixed_layer_height": int(line[67:73]),
 
-        "freezing_pressure": int(line[67:73]),
-        "freezing_height": int(line[73:79]),
+        "freezing_pressure": int(line[73:79]),
+        "freezing_height": int(line[79:85]),
 
-        "lcl_pressure": int(line[79:85]),
-        "lcl_height": int(line[85:91]),
+        "lcl_pressure": int(line[85:91]),
+        "lcl_height": int(line[91:97]),
 
-        "lfc_pressure": int(line[91:97]),
-        "lfc_height": int(line[97:103]),
+        "lfc_pressure": int(line[97:103]),
+        "lfc_height": int(line[103:109]),
 
-        "lnb_pressure": int(line[103:109]),
-        "lnb_height": int(line[109:115]),
+        "lnb_pressure": int(line[109:115]),
+        "lnb_height": int(line[115:121]),
 
-        "lifted_index": int(line[115:121]),
-        "showalter_index": int(line[121:127]),
-        "k_index": int(line[127:133]),
-        "total_totals_index": int(line[133:139]),
+        "lifted_index": int(line[121:127]),
+        "showalter_index": int(line[127:133]),
+        "k_index": int(line[133:139]),
+        "total_totals_index": int(line[139:145]),
 
-        "cape": int(line[139:145]),
-        "cin": int(line[145:151]),
+        "cape": int(line[145:151]),
+        "cin": int(line[151:157]),
     }
 
 
@@ -644,7 +641,7 @@ ds_drvd = derived_soundings_to_xarray(derived_soundings)
 ds = merge_sounding_datasets(ds_data, ds_drvd)
 
 # Write the output file to the data directory.
-output_file = data_file.split('-')[0] + '3.nc'
+output_file = data_file.split('-')[0] + '4.nc'
 ds.to_netcdf(DATA_DIR / output_file)
 
 print(f"Wrote {output_file} to the directory {DATA_DIR.resolve()}.")

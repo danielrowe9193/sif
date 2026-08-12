@@ -205,19 +205,28 @@ class Radiosonde:
 
     def summarize(self) -> None:
         """
-        Print a summary of the radiosonde datasets.
+        Print a summary of the radiosonde dataset.
 
-        This method prints both the standard‑pressure‑level dataset and the
-        full radiosonde dataset containing PTU and stability index data.
+        This method prints the dims, coordinates and datavars of
+        the radiosonde dataset.
 
         Returns
         -------
         None
         """
-        print(
-            f"{self.build_std_pressure_lvl_radiosonde()}\n\n"
-            f"{self.build_radiosonde()}"
+
+        ds = xr.open_dataset(
+            filename_or_obj=FileManagement.DATA_DIR / f"{self.filepath.stem}.nc"
         )
+
+        print(
+            f"Summary of {self.filepath.stem}.nc:\n"
+            f"{ds.dims}\n"
+            f"{ds.coords}\n"
+            f"{ds.data_vars}"
+        )
+
+        return None
 
 
 class Radiosondes:

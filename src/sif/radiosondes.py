@@ -173,10 +173,14 @@ class Radiosonde:
             .expand_dims(sounding_id=[sounding_id])
         )
 
-        sounding_ds['td'] = dewpoint_from_relative_humidity(
-            temperature=sounding_ds['ta'] * units.degK,
+        td = dewpoint_from_relative_humidity(
+            temperature=sounding_ds['ta'] * units.kelvin,
             relative_humidity=sounding_ds['rh'] * units.percent
         )
+
+        td = td.data.to(units('kelvin'))
+
+        sounding_ds['td'] = (sounding_ds['ta'].dims, td)
 
         stability_index_df = pd.DataFrame(stability_index_data)
         stability_index_df = (

@@ -44,6 +44,7 @@ class FileManagement:
 
         print(
             f"Summary of {path_to_data.stem}.nc:\n"
+            f"{ds}\n"
             f"{ds.dims}\n"
             f"{ds.coords}\n"
             f"{ds.data_vars}"

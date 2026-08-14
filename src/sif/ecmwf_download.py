@@ -1,3 +1,10 @@
+"""
+Downloads IFS data from ECMWF for one day.
+Data downloaded will have the 12, 24, and 48 forecasts for the 00z, 06z, 12z, and 18z cycles.
+Files downloaded are .grib2 and .index files.
+Website: https://data.ecmwf.int
+"""
+
 from pathlib import Path
 from datetime import datetime, timedelta
 import requests
@@ -18,7 +25,7 @@ steps = [12, 24, 48]
 
 def download_file(url: str, destination: Path, retries: int = 5):
     """
-    Download one file, resuming an existing partial download where possible.
+    Download one file, can handle partial downloads
     """
 
     destination.parent.mkdir(parents=True, exist_ok=True)
@@ -99,11 +106,9 @@ def download_cycle(date, cycle):
     / f"{date:%Y-%m-%d}"
     / cycle_string
     / "ifs"
-    # / "forecast"
 )
 
     for step in steps:
-
         filename = (
             f"{cycle_timestamp}"
             f"-{step}h-oper-fc.grib2"
@@ -121,7 +126,7 @@ def download_cycle(date, cycle):
 
         download_file(url, destination)
 
-        # Download the index too
+        # Download .index 
         index_url = url.replace(".grib2", ".index")
         index_destination = destination.with_suffix(".index")
 
@@ -129,6 +134,9 @@ def download_cycle(date, cycle):
 
 
 def download_date(date):
+    """
+    Download one day of data
+    """
     print("=" * 70)
     print(f"Downloading IFS oper: {date:%Y-%m-%d}")
     print("=" * 70)
@@ -153,7 +161,7 @@ if __name__ == "__main__":
             )
             break
 
-        except ValueError:
+        except ValueError: #prevent other date formats
             print(
                 "Invalid date format. "
                 "Please use YYYY-MM-DD, for example 2026-08-11."

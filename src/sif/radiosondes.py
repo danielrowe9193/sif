@@ -7,6 +7,7 @@ import zipfile
 from metpy.calc import dewpoint_from_relative_humidity
 from metpy.units import units
 from pathlib import Path
+from xarray import DataTree
 from utils import FileManagement
 
 
@@ -20,7 +21,7 @@ class Radiosonde:
 
     def __init__(
         self,
-        filepath: str,
+        filepath: str | Path,
     ):
         """
         Initialize a Radiosonde instance.
@@ -57,7 +58,7 @@ class Radiosonde:
 
         return None
 
-    def get_tree_from_xml(self, xml_filename: str) -> ET:
+    def _get_tree_from_xml(self, xml_filename: str) -> ET:
         """
         Parse an XML file and return its element tree.
 
@@ -87,7 +88,7 @@ class Radiosonde:
         xarray.Dataset
             Dataset containing radiosonde variables on standard pressure levels.
         """
-        root = self.get_tree_from_xml("StdPressureLevels.xml").getroot()
+        root = self._get_tree_from_xml("StdPressureLevels.xml").getroot()
 
         data = [
             {
@@ -112,7 +113,7 @@ class Radiosonde:
 
         return ds
 
-    def build_radiosonde(self) -> None:
+    def build_radiosonde(self) -> DataTree:
         """
         Construct a radiosonde dataset from synchronized PTU and stability index data.
 
@@ -127,8 +128,8 @@ class Radiosonde:
         -------
         None
         """
-        root_sounding_data = self.get_tree_from_xml("SynchronizedSoundingData.xml")
-        root_stability_index = self.get_tree_from_xml("StabilityIndex.xml")
+        root_sounding_data = self._get_tree_from_xml("SynchronizedSoundingData.xml")
+        root_stability_index = self._get_tree_from_xml("StabilityIndex.xml")
 
         sounding_data = [
             {
@@ -199,34 +200,7 @@ class Radiosonde:
 
         radiosonde = xr.merge([sounding_ds, stability_index_ds])
 
-        radiosonde.to_netcdf(FileManagement.DATA_DIR / f"{self.filepath.stem}.nc")
-
-        return None
-
-    def summarize(self) -> None:
-        """
-        Print a summary of the radiosonde dataset.
-
-        This method prints the dims, coordinates and datavars of
-        the radiosonde dataset.
-
-        Returns
-        -------
-        None
-        """
-
-        ds = xr.open_dataset(
-            filename_or_obj=FileManagement.DATA_DIR / f"{self.filepath.stem}.nc"
-        )
-
-        print(
-            f"Summary of {self.filepath.stem}.nc:\n"
-            f"{ds.dims}\n"
-            f"{ds.coords}\n"
-            f"{ds.data_vars}"
-        )
-
-        return None
+        return radiosonde
 
 
 class Radiosondes:
@@ -237,4 +211,35 @@ class Radiosondes:
     processing individual radiosondes and finally concatinating into a single dataset.
     """
 
-    ...
+    def __init__(self, mwx_dir: str | Path = Path('../../data/'), filename: str = 'sif.radiosondes.nc'):
+        """
+        Initialise the radiosondes by providing a directory that contains the `.mwx` files.
+        :param mwx_dir: The directory containing .mwx files that are processed.
+        """
+
+        self.mwx_dir = mwx_dir
+        self.filename = filename
+        self.rs_ds_list = []
+
+    def build_sif_radiosondes(self, save_to: str | Path = '../../data/'):
+        """
+        Iterates through self.mwx_dir, builds each radiosonde, concatenates them and exports as a .nc file.
+        :param save_to: The directory in which to store the sif_radiosondes .nc file.
+        :return: None
+        """
+
+        for file in self.mwx_dir.glob('*.mwx'):
+
+            rs = Radiosonde(
+                filepath=file
+            )
+            rs.extract_mwx()
+            rs_ds = rs.build_radiosonde()
+            self.rs_ds_list.append(rs_ds)
+
+        sif = xr.concat(self.rs_ds_list, dim='sounding_num', join='outer')
+        sif.to_netcdf(Path(save_to) / self.filename)
+
+        return None
+
+

@@ -6,7 +6,7 @@ import time
 
 BASE_URL = "https://data.ecmwf.int/forecasts"
 
-ARCHIVE_ROOT = Path("ifs")
+ARCHIVE_ROOT = Path(__file__).resolve().parent.parent.parent / "data" # points to the data folder
 
 # 00, 06, 12, 18 zz cycles
 CYCLES = [0, 6, 12, 18]
@@ -51,8 +51,7 @@ def download_file(url: str, destination: Path, retries: int = 5):
                 timeout=120,
             ) as response:
 
-                # If Range was requested but server ignored it,
-                # start over rather than corrupting the file.
+                # if requested but server ignored it, start over 
                 if existing_size and response.status_code == 200:
                     existing_size = 0
                     partial.unlink(missing_ok=True)

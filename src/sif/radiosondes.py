@@ -165,12 +165,12 @@ class Radiosonde:
 
         sounding_df = (
             sounding_df.drop(columns="sounding_id")
-            .set_index("height")
+            .set_index("p")
         )
 
         sounding_ds = (
             sounding_df.to_xarray()
-            .sortby("height")
+            .sortby("p", ascending=False)
             .expand_dims(sounding_id=[sounding_id])
         )
 
@@ -211,6 +211,8 @@ class Radiosondes:
     processing individual radiosondes and finally concatinating into a single dataset.
     """
 
+    PRESSURE_GRID = np.arange(1000, 9, -1)
+
     def __init__(self, mwx_dir: str | Path = Path('../../data/'), filename: str = 'sif.radiosondes.nc'):
         """
         Initialise the radiosondes by providing a directory that contains the `.mwx` files.
@@ -235,9 +237,12 @@ class Radiosondes:
             )
             rs.extract_mwx()
             rs_ds = rs.build_radiosonde()
+
+            rs_ds = rs_ds.interp(p=self.PRESSURE_GRID)
+
             self.rs_ds_list.append(rs_ds)
 
-        sif = xr.concat(self.rs_ds_list, dim='sounding_num', join='outer')
+        sif = xr.concat(self.rs_ds_list, dim='sounding_id', join='outer')
         sif.to_netcdf(Path(save_to) / self.filename)
 
         return None

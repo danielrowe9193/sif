@@ -1,7 +1,7 @@
-import pathlib
-import zipfile
-
 import numpy as np
+import xarray as xr
+
+from pathlib import Path
 
 
 class CalcUtils:
@@ -17,33 +17,36 @@ class PlotUtils:
 class FileManagement:
     """Utilities for handling files gathered during the experiment."""
 
-    PACKAGE_DIR = pathlib.Path(__file__).resolve().parent
+    PACKAGE_DIR = Path(__file__).resolve().parent
     PROJECT_DIR = PACKAGE_DIR.parent.parent
 
     DATA_DIR = PROJECT_DIR / 'data/'
     PLOT_DIR = PROJECT_DIR / 'plots/'
 
     @staticmethod
-    def make_directories():
-        """Creates data/ and plots/ directories if currently non-existant."""
-
-        ...
-
-    @staticmethod
-    def convert_mwx_to_zip():
+    def summarize(path_to_data: str | Path) -> None:
         """
-        Method that converts mwx to zip files.
-        :return: None
-        """
+        Print a summary of a dataset.
 
-        ...
+        This method prints the dims, coordinates and datavars of
+        the radiosonde dataset.
 
-    @staticmethod
-    def unzip():
-        """
-        Method that unzips data after it has been converted to zip.
-        :return: None
+        Returns
+        -------
+        None
         """
 
-        ...
+        path_to_data = Path(path_to_data)
 
+        ds = xr.open_dataset(
+            filename_or_obj=path_to_data
+        )
+
+        print(
+            f"Summary of {path_to_data.stem}.nc:\n"
+            f"{ds.dims}\n"
+            f"{ds.coords}\n"
+            f"{ds.data_vars}"
+        )
+
+        return None

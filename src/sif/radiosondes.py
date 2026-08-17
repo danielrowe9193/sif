@@ -1,5 +1,6 @@
 import numpy as np
 import pandas as pd
+import utils
 import xarray as xr
 import xml.etree.ElementTree as ET
 import zipfile
@@ -8,7 +9,6 @@ from metpy.calc import dewpoint_from_relative_humidity
 from metpy.units import units
 from pathlib import Path
 from xarray import DataTree
-from utils import FileManagement
 
 
 class Radiosonde:
@@ -36,25 +36,23 @@ class Radiosonde:
         NETCDF files.
         """
         self.filepath = Path(filepath)
-        self.directory = self.filepath.parent / self.filepath.stem
-        self.directory.mkdir(exist_ok=True)
+        self.extraction_dir = utils.FileManagement.XML_DIR / self.filepath.stem
+        self.extraction_dir.mkdir(exist_ok="True")
 
     def extract_mwx(self) -> None:
         """
         Extract XML files from the `.mwx` archive.
 
         The `.mwx` file is treated as a ZIP archive. All contents are extracted
-        into the directory specified by `extract_to`.
+        into the xml/ directory.
 
         Returns
         -------
         None
         """
-        extraction_dir = Path(self.directory)
-        extraction_dir.mkdir(parents=True, exist_ok=True)
 
         with zipfile.ZipFile(self.filepath, "r") as z:
-            z.extractall(self.directory)
+            z.extractall(self.extraction_dir)
 
         return None
 
@@ -73,7 +71,8 @@ class Radiosonde:
         xml.etree.ElementTree.ElementTree
             Parsed XML element tree.
         """
-        xml_filepath = self.directory / xml_filename
+
+        xml_filepath = self.extraction_dir / xml_filename
         return ET.parse(xml_filepath)
 
     def build_std_pressure_lvl_radiosonde(self) -> xr.Dataset:
@@ -113,7 +112,7 @@ class Radiosonde:
 
         return ds
 
-    def build_radiosonde_profile_ds(self) -> DataTree:
+    def build_radiosonde_profile_ds(self) -> xr.Dataset:
         """
         Construct a radiosonde profile dataset from synchronized PTU.
 
@@ -145,7 +144,7 @@ class Radiosonde:
                 "lat": float(row.get("Latitude")),
                 "lon": float(row.get("Longitude")),
                 "sounding_id": row.get("SoundingIdPk"),
-                'time': row.get("DataSrvTime")
+                "time": row.get("DataSrvTime"),
             }
             for row in root_sounding_data.findall("Row")
         ]
@@ -153,25 +152,25 @@ class Radiosonde:
         sounding_df = pd.DataFrame(sounding_data)
         sounding_id = sounding_df["sounding_id"].iloc[0]
 
-        sounding_df = (
-            sounding_df.drop(columns="sounding_id")
-            .set_index("p")
-        )
+        sounding_df = sounding_df.drop(columns="sounding_id").set_index("p")
 
-        sounding_ds = (
-            sounding_df.to_xarray()
-            .sortby("p", ascending=False)
-            .expand_dims(sounding_id=[sounding_id])
-        )
+        sounding_ds = sounding_df.to_xarray().sortby("p", ascending=False)
 
         td = dewpoint_from_relative_humidity(
-            temperature=sounding_ds['ta'] * units.kelvin,
-            relative_humidity=sounding_ds['rh'] * units.percent
+            temperature=sounding_ds["ta"] * units.kelvin,
+            relative_humidity=sounding_ds["rh"] * units.percent,
         )
 
-        td = td.data.to(units('kelvin'))
+        td = td.data.to(units("kelvin"))
 
-        sounding_ds['td'] = (sounding_ds['ta'].dims, td)
+        td = td.magnitude
+
+        sounding_ds["td"] = (sounding_ds["ta"].dims, td)
+
+        sounding_ds = utils.CalcUtils.calculate_k_index(sounding_ds)
+        sounding_ds = utils.CalcUtils.calculate_cape(sounding_ds)
+        sounding_ds = utils.CalcUtils.calculate_tt_index(sounding_ds)
+        sounding_ds = utils.CalcUtils.calculate_li(sounding_ds)
 
         return sounding_ds
 
@@ -188,7 +187,7 @@ class Radiosonde:
                 "indices": row.get("NamePk"),
                 "value": row.get("Value"),
                 "sounding_id": row.get("SoundingIdPk"),
-                "time": row.get("DataSrvTime")
+                "time": row.get("DataSrvTime"),
             }
             for row in root_stability_index.findall("Row")
         ]
@@ -196,19 +195,15 @@ class Radiosonde:
         stability_index_df = pd.DataFrame(stability_index_data)
         sounding_id = stability_index_df["sounding_id"].iloc[0]
 
-        stability_index_df = (
-            stability_index_df.drop(columns="sounding_id")
-            .set_index("indices")
+        stability_index_df = stability_index_df.drop(columns="sounding_id").set_index(
+            "indices"
         )
 
         stability_index_df["value"] = pd.to_numeric(
             stability_index_df["value"], errors="coerce"
         )
 
-        stability_index_ds = (
-            stability_index_df.to_xarray()
-            .expand_dims(sounding_id=[sounding_id])
-        )
+        stability_index_ds = stability_index_df.to_xarray()
 
         return stability_index_ds
 
@@ -223,7 +218,12 @@ class Radiosondes:
 
     PRESSURE_GRID = np.arange(1000, 9, -1)
 
-    def __init__(self, mwx_dir: str | Path = Path('../../data/'), profiles_filename: str = 'sif.radiosondes.profiles.nc', indices_filename: str = 'sif.radiosondes.indices.nc'):
+    def __init__(
+        self,
+        mwx_dir: str | Path = utils.FileManagement.MWX_DIR,
+        profiles_filename: str = "sif.radiosondes.profiles.nc",
+        indices_filename: str = "sif.radiosondes.indices.nc",
+    ):
         """
         Initialise the radiosondes by providing a directory that contains the `.mwx` files.
         :param mwx_dir: The directory containing .mwx files that are processed.
@@ -233,7 +233,9 @@ class Radiosondes:
         self.profiles_filename = profiles_filename
         self.indices_filename = indices_filename
 
-    def build_sif_radiosonde_profiles_ds(self, save_to: str | Path = '../../data/'):
+    def build_sif_radiosonde_profiles_ds(
+        self, save_to: str | Path = utils.FileManagement.NETCDF_DIR
+    ) -> xr.Dataset:
         """
         Iterates through self.mwx_dir, builds each radiosonde profile, concatenates them and exports as a .nc file.
         :param save_to: The directory in which to store the sif_radiosondes .nc file.
@@ -242,11 +244,8 @@ class Radiosondes:
 
         rs_ds_list = []
 
-        for file in self.mwx_dir.glob('*.mwx'):
-
-            rs = Radiosonde(
-                filepath=file
-            )
+        for file in self.mwx_dir.glob("*.mwx"):
+            rs = Radiosonde(filepath=file)
             rs.extract_mwx()
             rs_ds = rs.build_radiosonde_profile_ds()
 
@@ -254,12 +253,14 @@ class Radiosondes:
 
             rs_ds_list.append(rs_ds)
 
-        sif = xr.concat(rs_ds_list, dim='sounding_id', join='outer')
+        sif = xr.concat(rs_ds_list, dim="sounding_id", join="outer")
         sif.to_netcdf(Path(save_to) / self.profiles_filename)
 
-        return None
+        return sif
 
-    def build_sif_radiosonde_indices_ds(self, save_to: str | Path = '../../data/'):
+    def build_sif_radiosonde_indices_ds(
+        self, save_to: str | Path = utils.FileManagement.XML_DIR
+    ):
         """
 
         :param save_to:
@@ -268,19 +269,14 @@ class Radiosondes:
 
         rs_ds_list = []
 
-        for file in self.mwx_dir.glob('*.mwx'):
-
-            rs = Radiosonde(
-                filepath=file
-            )
+        for file in self.mwx_dir.glob("*.mwx"):
+            rs = Radiosonde(filepath=file)
             rs.extract_mwx()
             rs_ds = rs.build_radiosonde_stability_indices_ds()
 
             rs_ds_list.append(rs_ds)
 
-        sif = xr.concat(rs_ds_list, dim='sounding_id', join='outer')
+        sif = xr.concat(rs_ds_list, dim="sounding_id", join="outer")
         sif.to_netcdf(Path(save_to) / self.indices_filename)
 
         return None
-
-

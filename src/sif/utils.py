@@ -120,50 +120,73 @@ class CalcUtils:
 
     @staticmethod
     def calculate_li(profile: xr.Dataset | xr.DataTree):
-        p = profile.p.values
-        t = profile.ta.values
-        td = profile.td.values
-        h = profile.height.values
 
-        def li(p, t, td, h):
-            # Attach units
-            p = p * units.hPa
-            t = t * units.kelvin
-            td = td * units.kelvin
-            h = h * units.m
+        def calculate_single_li(p, t, td, h):
 
-            # Convert temperature to Celsius
-            t = t.to("degC")
-            td = td.to("degC")
+            try:
+                # Attach units
+                p = p * units.hPa
+                t = t * units.kelvin
+                td = td * units.kelvin
+                h = h * units.m
 
-            # Calculate 500-m mixed parcel
-            parcel_p, parcel_t, parcel_td = mpcalc.mixed_parcel(
-                p, t, td, depth=500 * units.m, height=h
-            )
+                # Convert temperatures
+                t = t.to("degC")
+                td = td.to("degC")
 
-            # Select levels above the mixed layer
-            above = h > 500 * units.m
+                # 500-m mixed parcel
+                parcel_p, parcel_t, parcel_td = mpcalc.mixed_parcel(
+                    p,
+                    t,
+                    td,
+                    depth=500 * units.m,
+                    height=h
+                )
 
-            # Replace lowest 500 m with mixed values
-            press = np.concatenate([[parcel_p], p[above]])
+                # Replace lowest 500 m with mixed parcel
+                above = h > 500 * units.m
 
-            temp = np.concatenate([[parcel_t], t[above]])
+                press = np.concatenate([
+                    [parcel_p],
+                    p[above]
+                ])
 
-            # Calculate parcel profile
-            mixed_prof = mpcalc.parcel_profile(press, parcel_t, parcel_td)
+                temp = np.concatenate([
+                    [parcel_t],
+                    t[above]
+                ])
 
-            # Calculate Lifted Index
-            li = mpcalc.lifted_index(press, temp, mixed_prof)
+                # Parcel profile
+                mixed_prof = mpcalc.parcel_profile(
+                    press,
+                    parcel_t,
+                    parcel_td
+                )
 
-            return li.magnitude
+                # Lifted Index
+                li = mpcalc.lifted_index(
+                    press,
+                    temp,
+                    mixed_prof
+                )
+
+                return li.magnitude.item()
+
+            except Exception:
+                return np.nan
 
         li = xr.apply_ufunc(
-            li,
-            p,
-            t,
-            td,
-            h,
-            input_core_dims=[["p"], ["p"], ["p"], ["p"]],
+            calculate_single_li,
+            profile["p"],
+            profile["ta"],
+            profile["td"],
+            profile["height"],
+            input_core_dims=[
+                ["p"],
+                ["p"],
+                ["p"],
+                ["p"],
+            ],
             output_core_dims=[[]],
             vectorize=True,
             output_dtypes=[float],
@@ -270,7 +293,12 @@ class FileManagement:
 
             # Case 2: filename ends with date + time → move them to the front
             # Example: Westermarkelsdorf_RS92_20260811_114920.mwx
-            if len(parts[-2]) == 8 and parts[-2].isdigit() and len(parts[-1]) == 6 and parts[-1].isdigit():
+            if (
+                len(parts[-2]) == 8
+                and parts[-2].isdigit()
+                and len(parts[-1]) == 6
+                and parts[-1].isdigit()
+            ):
                 date = parts[-2] + "_" + parts[-1]
                 rest = "_".join(parts[:-2])
                 new_name = f"{date}_{rest}{file.suffix}"

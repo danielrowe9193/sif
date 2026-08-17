@@ -1,23 +1,24 @@
-import xarray as xr
+import utils
 
-from plot import FehmarnRadiosondePlotter
-from radiosondes import Radiosonde
+from plot import FehmarnRadiosondeProfilePlotter, FehmarnRadiosondeIndicesPlotter
+from radiosondes import Radiosonde, Radiosondes
 
-stem = "RS_TestData_Westermarkelsdorf_20220825_131825"
+# Rename files so there are sorted by date.
+utils.FileManagement.rename_mwx(utils.FileManagement.MWX_DIR)
 
-# Construct radiosonde from .mwx data.
-radiosonde = Radiosonde(
-    filepath=f"../../data/{stem}.mwx"
+# Read radiosondes and
+radiosondes = Radiosondes().build_sif_radiosonde_profiles_ds()
+print(radiosondes)
+
+# Plot skew-t for each radiosonde
+profile_plotter = FehmarnRadiosondeProfilePlotter(
+    filepath="../../data/netcdf/sif.radiosondes.profiles.nc"
 )
-radiosonde.extract_mwx()
-radiosonde.build_radiosonde()
-radiosonde.summarize()
+for sounding in radiosondes.sounding_id.values:
+    profile_plotter.plot_skewt(sounding)
 
-# Can load radiosonde data as xarray dataset, if desired.
-ds = xr.open_dataset(f'../../data/{stem}.nc')
-
-# Plot a skew-t diagram of the radiosonde.
-plotter = FehmarnRadiosondePlotter(
-    filepath=f'../../data/{stem}.nc'
+# Plot indices
+plotter = FehmarnRadiosondeIndicesPlotter(
+    filepath="../../data/netcdf/sif.radiosondes.profiles.nc"
 )
-plotter.plot_skewt()
+plotter.plot_indices_over_time()

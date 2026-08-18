@@ -49,10 +49,13 @@ extensions = ".grib2"
 
 BASE_PATH = Path(__file__).resolve().parent.parent.parent / "data" / "IFS"
 
-for i in cycles:
-    input_folder = BASE_PATH / date_input / f"{i}z" / "ifs" 
-    output_folder = BASE_PATH / date_input / "netCDF" / f"{i}z" 
+for cycle in cycles:
+    input_folder = BASE_PATH / date_input / f"{cycle}z" / "ifs" 
+    output_folder = BASE_PATH / date_input / "netCDF" / f"{cycle}z" 
     output_folder.mkdir(parents=True, exist_ok=True)
+
+    # concat by station to each cycle
+    datasets = []
 
     for filename in input_folder.iterdir():
         if filename.is_file() and filename.suffix.lower() in extensions:
@@ -67,12 +70,23 @@ for i in cycles:
                     ]
                 data = xr.open_dataset(filename, engine="cfgrib")
                 data = select_station(data, stations)
-                output_file = output_folder / f"{filename.stem}.nc"
+                # output_file = output_folder / f"{filename.stem}.nc"
 
-                data.to_netcdf(output_file)
-                data.close()
+                # data.to_netcdf(output_file)
+                # data.close()
 
-                print(f"  → {output_file.name}")
+                # print(f"  → {output_file.name}")
+                datasets.append(data)
 
             except Exception as e:
                 print(f"  ERROR: {e}")
+
+    # Concatenate all datasets into one
+    combined = xr.concat(datasets, dim="valid_time")
+
+    # Choose your output filename
+    output_file = output_folder / f"ALL-{date_input}-{cycle}z.nc"
+
+    combined.to_netcdf(output_file)
+
+    combined.close()

@@ -4,75 +4,145 @@ This file pulls data from the National Oceanic and Atmospheric Administration
 Website: https://nomads.ncep.noaa.gov/gribfilter.php?ds=gfs_0p25
 """
 
-from pathlib import Path
-import time
 from datetime import datetime
+from pathlib import Path
 from urllib.request import Request, urlopen
 from urllib.error import HTTPError, URLError
+from urllib.parse import urlencode
+import time
 
-# 00z, 06z, 12z, 18z
-CYCLES = ["00", "06", "12", "18"]
-# 12, 24, and 48 hour forecasts
-STEPS = [12, 24, 48]
 
 BASE_URL = ("https://nomads.ncep.noaa.gov/cgi-bin/filter_gfs_0p25.pl")
 
+# GFS cycles to download
+CYCLES = [ "00", "06", "12", "18"]
+
+# Forecast files
+FORECAST_FILES = [".anl", ".f012", ".f024", ".f048"]
+
 def set_settings():
+    """
+    Define the geographic region and GRIB variables/levels.
+    """
+
     return {
-        # latitude and longitude
+        # Geographic region
         "leftlon": 5,
         "rightlon": 20,
         "bottomlat": 50,
         "toplat": 57,
 
-        # all variables and levels
         "all_var": "on",
         "all_lev": "on",
-        "subregion": "",
-    }
 
+        "subregion": "on",
+    }
 
 def get_date():
     """
-    Ask for a date
+    Ask the user for a date.
     """
 
     while True:
         date_input = input("Enter date (YYYY-MM-DD): ").strip()
+
         try:
             date_obj = datetime.strptime(date_input,"%Y-%m-%d")
             return date_obj
 
         except ValueError:
-            print("Invalid date. "
-            "Please use YYYY-MM-DD."
+            print(
+                "Invalid date. "
+                "Please use YYYY-MM-DD."
             )
 
 def download_file(url, output_file):
     """
-    Download a file and display a progress indicator.
+    Download a GRIB2 file
+
+    The first four bytes are checked to make sure the server
+    actually returned GRIB2 data.
     """
 
     try:
-        request = Request(url,headers={
-                "User-Agent": "GFS downloader"
-            }
+        request = Request(
+            url,
+            headers={"User-Agent": "GFS downloader"}
         )
 
-        with urlopen(request,timeout=60) as response:
+        with urlopen(
+            request,
+            timeout=120
+        ) as response:
+ 
+            # Check response
+            content_type = response.headers.get("Content-Type","")
 
-            total_size = response.headers.get("Content-Length")
+            # Read the first four bytes.
+            # A GRIB2 file should start with b"GRIB".
+            first_bytes = response.read(4)
+            if first_bytes != b"GRIB":
+
+                # The response is probably an HTML error page.
+                error_content = response.read(1000)
+
+                try:
+                    error_text = error_content.decode(
+                        "utf-8",
+                        errors="replace"
+                    )
+                except Exception:
+                    error_text = repr(error_content)
+
+                print(
+                    "    ERROR: Server did not return "
+                    "a GRIB2 file."
+                )
+
+                print(
+                    f"    Content-Type: {content_type}"
+                )
+
+                print(
+                    f"    First bytes: {first_bytes!r}"
+                )
+
+                print(
+                    "    Server response:"
+                )
+
+                print(
+                    f"    {error_text[:500]}"
+                )
+
+                return False
+
+            total_size = response.headers.get(
+                "Content-Length"
+            )
 
             if total_size:
                 total_size = int(total_size)
 
-            downloaded = 0
+            downloaded = 4
+
             chunk_size = 1024 * 1024  # 1 MB
 
-            with open(output_file,"wb") as f:
+            # write file
+            with open(
+                output_file,
+                "wb"
+            ) as f:
+
+                # Write the four bytes we already read
+                f.write(first_bytes)
 
                 while True:
-                    chunk = response.read(chunk_size )
+
+                    chunk = response.read(
+                        chunk_size
+                    )
+
                     if not chunk:
                         break
 
@@ -82,8 +152,10 @@ def download_file(url, output_file):
 
                     if total_size:
 
-                        percent = (downloaded / total_size *100)
+                        percent = (downloaded / total_size* 100)
+
                         downloaded_mb = (downloaded / (1024 ** 2))
+
                         total_mb = (total_size / (1024 ** 2))
 
                         print(
@@ -104,7 +176,6 @@ def download_file(url, output_file):
                             end="",
                             flush=True
                         )
-        print()
 
         return True
 
@@ -135,45 +206,99 @@ def download_file(url, output_file):
         return False
 
 
-def download_cycle(date_string,cycle,output_dir):
+def build_url(date_string, cycle, filename,settings):
     """
-    Download the GFS 12, 24, and 48 hour forecast and analysis files for one cycle.
+    Build the NOMADS GFS 0.25 degree GRIB filter URL.
+
+    Example structure:
+    https://nomads.ncep.noaa.gov/cgi-bin/filter_gfs_0p25.pl
+        ?file=gfs.t00z.pgrb2.0p25.f012
+        &all_var=on
+        &all_lev=on
+        &subregion=on
+        &leftlon=5
+        &rightlon=20
+        &toplat=57
+        &bottomlat=50
+        &dir=/gfs.YYYYMMDD/00/atmos
     """
 
-    yyyymmdd = date_string.replace("-","")
+    yyyymmdd = date_string.replace("-", "")
 
-    forecast_files = [
-        ".anl",
-        ".f012",
-        ".f024",
-        ".f048",
-    ]
+    directory = (
+        f"/gfs.{yyyymmdd}/"
+        f"{cycle}/"
+        f"atmos"
+    )
 
-    for name in forecast_files:
+    params = {
+        "file": filename,
+
+        "all_var": settings["all_var"],
+
+        # Levels
+        "all_lev": settings["all_lev"],
+
+        # Geographic subset
+        "subregion": settings["subregion"],
+        "leftlon": settings["leftlon"],
+        "rightlon": settings["rightlon"],
+        "toplat": settings["toplat"],
+        "bottomlat": settings["bottomlat"],
+
+        # Source directory
+        "dir": directory,
+    }
+
+    return (
+        f"{BASE_URL}?"
+        f"{urlencode(params)}"
+    )
+
+
+# ============================================================
+# Download one GFS cycle
+# ============================================================
+
+def download_cycle(date_string, cycle, output_dir, settings):
+    """
+    Download the GFS analysis and 12, 24 and 48 hour
+    forecast files for one cycle.
+
+    Data is geographically subset to the region defined
+    in settings.
+    """
+
+    success_all = True
+
+    for name in FORECAST_FILES:
+
         filename = (
             f"gfs.t{cycle}z."
-            f"pgrb2.0p25{name}"
+            f"pgrb2.0p25"
+            f"{name}"
         )
-
-        url = (
-            f"{BASE_URL}/"
-            f"gfs.{yyyymmdd}/"
-            f"{cycle}/"
-            f"atmos/"
-            f"{filename}"
-        )
+        # build url
+        url = build_url(date_string, cycle, filename, settings)
 
         output_file = Path(output_dir) / filename
 
-        print(f"Downloading cycle {cycle} UTC")
+        print(
+            f"Downloading cycle "
+            f"{cycle} UTC"
+        )
 
-        print(f"    File: {filename}")
-
-        # check if file exists already
+        print(
+            f"    File: {filename}"
+        )
+        # check if it already exists
         if output_file.exists():
 
-            size_mb = (output_file.stat().st_size / (1024 ** 2))
-
+            size_mb = (
+                output_file.stat().st_size
+                / (1024 ** 2)
+            )
+            # check
             if size_mb > 0.1:
 
                 print(
@@ -196,16 +321,14 @@ def download_cycle(date_string,cycle,output_dir):
 
                 output_file.unlink()
 
-        # variable to check if file downloaded
+        print(f"    URL: {url}")
+
         success = download_file(url, output_file)
 
         if success:
-
             size_mb = (output_file.stat().st_size / (1024 ** 2))
 
-            print(
-                f"    Saved: {output_file}"
-            )
+            print(f"    Saved: {output_file}")
 
             print(
                 f"    Size: "
@@ -213,76 +336,63 @@ def download_cycle(date_string,cycle,output_dir):
             )
 
         else:
-            # Remove incomplete file
+            # Remove invalid/incomplete file
             if output_file.exists():
                 output_file.unlink()
-            print("    Download failed.")
-            return False
 
-def download_all_cycles(date_string,output_dir):
+            print("    Download failed.")
+
+            success_all = False
+
+    return success_all
+
+
+# Download all cycles
+def download_all_cycles(date_string, output_dir, settings):
     """
-    Download GFS analysis files for
-    00, 06, 12 and 18 UTC.
+    Download GFS data for all configured cycles.
+    NOMADS recommends a delay between repeated requests.
     """
 
     print("Starting downloads...")
 
-    for i, cycle in enumerate(CYCLES):
-        print("--------------------------------------------------")
+    all_success = True
 
+    for i, cycle in enumerate(CYCLES):
+        
         print(f"[{i + 1}/{len(CYCLES)}]")
 
-        success = download_cycle(
-            date_string,
-            cycle,
-            output_dir
-        )
+        success = download_cycle(date_string, cycle, output_dir, settings)
 
+        if not success:
+            all_success = False
         # wait
         if i < len(CYCLES) - 1:
-            print(
-                "Waiting 10 seconds "
-                "before next download..."
-            )
+            print("Waiting 10 seconds before next cycle...")
             time.sleep(10)
-
-    print("--------------------------------------------------")
+    return all_success
 
 if __name__ == "__main__":
-    
-    # set configurations
+
     settings = set_settings()
-    print("Configured geographic area:")
 
-    print(
-        f"    Longitude: "
-        f"{settings['leftlon']}° "
-        f"to "
-        f"{settings['rightlon']}°"
-    )
-
-    print(
-        f"    Latitude: "
-        f"{settings['bottomlat']}° "
-        f"to "
-        f"{settings['toplat']}°"
-    )
-
-    # get date
     date_obj = get_date()
-    date_string = date_obj.strftime( "%Y-%m-%d")
-    yyyymmdd = date_obj.strftime( "%Y%m%d")
 
-    BASE_PATH = Path(__file__).resolve().parent.parent.parent / "data" 
-    output_dir = BASE_PATH / "GFS" / f"{date_string}"
+    date_string = date_obj.strftime("%Y-%m-%d")
+
+    BASE_PATH = Path(__file__).resolve().parent.parent.parent / "data"
+
+    output_dir = (BASE_PATH / "GFS" / date_string)
+
     output_dir.mkdir(parents=True, exist_ok=True)
 
-    print(
-        f"Downloading GFS analysis "
-        f"files for {date_string}"
-    )
+    print(f"Downloading GFS data for {date_string}")
+    # download
+    success = download_all_cycles(date_string, output_dir, settings)
 
-    # download all the cycles
-    download_all_cycles(date_string,output_dir)
+    if success:
+        print("All downloads completed successfully.")
+    else:
+        print("One or more downloads failed.")
 
     print("Finished.")

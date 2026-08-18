@@ -83,8 +83,7 @@ for cycle in cycles:
 
     # Concatenate all datasets into one
     combined = xr.concat(datasets, dim="valid_time")
-
-    # Choose your output filename
+    
     output_file = output_folder / f"ALL-{date_input}-{cycle}z.nc"
 
     combined.to_netcdf(output_file)

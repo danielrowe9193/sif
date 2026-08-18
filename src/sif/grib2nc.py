@@ -29,7 +29,19 @@ def get_date():
     return date_string
 
 # select station function here
-# 
+def select_station(data, stations):
+    selected = []
+    for name, lat, lon in stations:
+        point = data.sel(
+            latitude=lat,
+            longitude=lon,
+            method="nearest"
+        )
+        # add station as another dimension
+        point = point.expand_dims(station=[name])
+        selected.append(point)
+
+    return xr.concat(selected, dim="station")
          
 date_input = get_date()
 cycles = ["00","06","12","18"]
@@ -47,7 +59,14 @@ for i in cycles:
             print(f"Converting: {filename.name}")
 
             try:
+                stations = [
+                    ("Fehmarn", 54.527846, 11.060437), # Fehmarn
+                    ("Schleswig", 54.528, 9.55), # Schleswig
+                    ("Greifswald", 54.097, 13.405), # Greifswald
+                    ("Norderney", 53.712, 7.152), # Norderney
+                    ]
                 data = xr.open_dataset(filename, engine="cfgrib")
+                data = select_station(data, stations)
                 output_file = output_folder / f"{filename.stem}.nc"
 
                 data.to_netcdf(output_file)

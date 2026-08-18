@@ -27,7 +27,10 @@ def get_date():
                 "Please use YYYY-MM-DD, for example 2026-08-11."
             )
     return date_string
-            
+
+# select station function here
+# 
+         
 date_input = get_date()
 cycles = ["00","06","12","18"]
 extensions = ".grib2"
@@ -36,8 +39,8 @@ BASE_PATH = Path(__file__).resolve().parent.parent.parent / "data" / "IFS"
 
 for i in cycles:
     input_folder = BASE_PATH / date_input / f"{i}z" / "ifs" 
-    output_folder = input_folder
-# output_folder.mkdir(parents=True, exist_ok=True)
+    output_folder = BASE_PATH / date_input / "netCDF" / f"{i}z" 
+    output_folder.mkdir(parents=True, exist_ok=True)
 
     for filename in input_folder.iterdir():
         if filename.is_file() and filename.suffix.lower() in extensions:

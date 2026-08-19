@@ -8,7 +8,6 @@ import zipfile
 from metpy.calc import dewpoint_from_relative_humidity
 from metpy.units import units
 from pathlib import Path
-from xarray import DataTree
 
 
 class Radiosonde:
@@ -233,10 +232,15 @@ class Radiosondes:
         self.profiles_filename = profiles_filename
         self.indices_filename = indices_filename
 
-    def build_sif_radiosonde_profiles_ds(
+    def build_sif_radiosonde_profiles_ds_lvl0(
         self, save_to: str | Path = utils.FileManagement.NETCDF_DIR
     ) -> xr.Dataset:
         """
+        Constructs the level 0 dataset for radiosondes launched during SIF.
+
+        The level 0 dataset contains all radiosondes, interpolated on a common pressure grid. Faulty radiosondes
+        are not removed from this dataset.
+
         Iterates through self.mwx_dir, builds each radiosonde profile, concatenates them and exports as a .nc file.
         :param save_to: The directory in which to store the sif_radiosondes .nc file.
         :return: None

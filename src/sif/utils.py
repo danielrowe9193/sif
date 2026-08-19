@@ -10,6 +10,61 @@ class CalcUtils:
     """Utilities for calculations during the experiment."""
 
     @staticmethod
+    def calculate_height_from_geopotential(profile: xr.Dataset | xr.DataTree):
+
+        geopot = profile['z']
+
+        def z_from_geo(geopot):
+
+            geopot = geopot * units('m^2/s^2')
+            height = mpcalc.geopotential_to_height(geopot)
+
+            return height.magnitude
+
+        height = xr.apply_ufunc(
+            z_from_geo,
+            geopot,
+            input_core_dims=[["p"]],
+            output_core_dims=[['p']],
+            vectorize=True,
+            dask="parallelized",
+            output_dtypes=[float],
+        )
+
+        profile['height'] = height
+
+        return profile
+
+    @staticmethod
+    def calculate_td_from_q(profile: xr.Dataset | xr.DataTree):
+
+        p = profile["p"]
+        q = profile["q"]
+
+        def td(p, q):
+            p = p * units.hPa
+            q = q * units("kg/kg")
+
+            td = (mpcalc.dewpoint_from_specific_humidity(p, q)).to(units.kelvin)
+
+            return td.magnitude
+
+        t_d = xr.apply_ufunc(
+            td,
+            p,
+            q,
+            input_core_dims=[["p"], ["p"]],
+            output_core_dims=[['p']],
+            vectorize=True,
+            dask="parallelized",
+            output_dtypes=[float],
+        )
+
+        profile['td'] = t_d
+
+        return profile
+
+    @staticmethod
     def calculate_cape(profile: xr.Dataset | xr.DataTree):
         """
         Calculate CAPE and CIN from a collection of soundings.
@@ -136,39 +191,21 @@ class CalcUtils:
 
                 # 500-m mixed parcel
                 parcel_p, parcel_t, parcel_td = mpcalc.mixed_parcel(
-                    p,
-                    t,
-                    td,
-                    depth=500 * units.m,
-                    height=h
+                    p, t, td, depth=500 * units.m, height=h
                 )
 
                 # Replace lowest 500 m with mixed parcel
                 above = h > 500 * units.m
 
-                press = np.concatenate([
-                    [parcel_p],
-                    p[above]
-                ])
+                press = np.concatenate([[parcel_p], p[above]])
 
-                temp = np.concatenate([
-                    [parcel_t],
-                    t[above]
-                ])
+                temp = np.concatenate([[parcel_t], t[above]])
 
                 # Parcel profile
-                mixed_prof = mpcalc.parcel_profile(
-                    press,
-                    parcel_t,
-                    parcel_td
-                )
+                mixed_prof = mpcalc.parcel_profile(press, parcel_t, parcel_td)
 
                 # Lifted Index
-                li = mpcalc.lifted_index(
-                    press,
-                    temp,
-                    mixed_prof
-                )
+                li = mpcalc.lifted_index(press, temp, mixed_prof)
 
                 return li.magnitude.item()
 

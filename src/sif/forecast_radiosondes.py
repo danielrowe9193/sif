@@ -2,6 +2,7 @@ import numpy as np
 import xarray as xr
 
 from config import Constants
+from pathlib import Path
 from utils import CalcUtils, FileManagement
 
 xr.set_options(use_new_combine_kwarg_defaults=True)
@@ -23,14 +24,15 @@ class IFSLevelZero:
         """
         Initialize an IFSLevelZero instance.
         """
-
         self.data_dir = FileManagement.IFS_DIR
 
         self._ifs_path_list = []
         self._ifs_ds_list = []
 
         self.dataset: None | xr.Dataset = None
-        self.dataset_filepath = FileManagement.IFS_DIR / "ifs.radiosondes.profiles.level0.nc"
+        self.dataset_filepath = (
+            FileManagement.IFS_DIR / "ifs.radiosondes.profiles.level0.nc"
+        )
 
     def collect_fc_file_paths(self) -> None:
         """
@@ -73,10 +75,9 @@ class IFSLevelZero:
             )
 
             # Compute initialization time
-            init_time = (
-                ifs_ds.sel(forecast_hour="12h").valid_time.values
-                - np.timedelta64(12, "h")
-            )
+            init_time = ifs_ds.sel(
+                forecast_hour="12h"
+            ).valid_time.values - np.timedelta64(12, "h")
 
             ifs_ds = ifs_ds.assign_coords(
                 init_time=("valid_time", [init_time, init_time, init_time])
@@ -93,6 +94,7 @@ class IFSLevelZero:
             self._ifs_ds_list.append(ifs_ds)
 
         self.dataset = xr.concat(self._ifs_ds_list, dim="valid_time")
+
         return None
 
     def export_ifs_level_zero_ds(self) -> None:
@@ -130,12 +132,11 @@ class IFSLevelOne:
         The Level‑0 dataset is loaded from disk and stored as `self.dataset`.
         """
         self.ifs_level_zero = ifs_level_zero
-        self.ifs_level_zero.collect_fc_file_paths()
-        self.ifs_level_zero.build_ifs_level_zero_ds()
-        self.ifs_level_zero.export_ifs_level_zero_ds()
 
         self.dataset = xr.open_dataset(self.ifs_level_zero.dataset_filepath)
-        self.dataset_filepath = FileManagement.IFS_DIR / "ifs.radiosondes.profiles.level1.nc"
+        self.dataset_filepath = (
+            FileManagement.IFS_DIR / "ifs.radiosondes.profiles.level1.nc"
+        )
 
     def build_ifs_level_one_ds(self) -> None:
         """
@@ -144,6 +145,7 @@ class IFSLevelOne:
         This method applies several derived meteorological indices to the
         Level‑0 dataset:
 
+        - Dewpoint Temperature
         - CAPE (Convective Available Potential Energy)
         - K‑index
         - TT‑index (Total Totals)
@@ -155,6 +157,8 @@ class IFSLevelOne:
         -------
         None
         """
+        self.dataset = CalcUtils.calculate_td_from_q(self.dataset)
+        self.dataset = CalcUtils.calculate_height_from_geopotential(self.dataset)
         self.dataset = CalcUtils.calculate_cape(self.dataset)
         self.dataset = CalcUtils.calculate_k_index(self.dataset)
         self.dataset = CalcUtils.calculate_tt_index(self.dataset)

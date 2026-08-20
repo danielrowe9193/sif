@@ -16,7 +16,7 @@ from siphon.simplewebservice.igra2 import IGRAUpperAir
 ####################################################
 # Create a datetime object for the sounding and string of the station identifier.
 date = datetime(2014, 9, 10, 0)
-station = 'USM00070026'
+station = "USM00070026"
 
 ####################################################
 # Make the request. IGRAUpperAir returns a dataframe containing the sounding data and
@@ -32,8 +32,8 @@ print(header.columns)
 
 ####################################################
 # Pull out a specific column of data.
-print(df['pressure'])
-print(header['latitude'])
+print(df["pressure"])
+print(header["latitude"])
 
 ####################################################
 # Units are stored in a dictionary with the variable name as the key in the `units`
@@ -42,12 +42,12 @@ print(df.units)
 print(header.units)
 
 ####################################################
-print(df.units['pressure'])
+print(df.units["pressure"])
 
 ####################################################
 # Multiple records can be extracted simultaneously:
 date = [datetime(2014, 9, 10, 0), datetime(2015, 9, 10, 12)]
-station = 'USM00070026'
+station = "USM00070026"
 df, header = IGRAUpperAir.request_data(date, station)
 
 print(df.head())

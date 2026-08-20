@@ -124,12 +124,11 @@ class IFSLevelOne:
         Parameters
         ----------
         ifs_level_zero : IFSLevelZero
-            A fully initialized Level‑0 processor. Its dataset is built and
-            exported automatically during initialization.
+            A fully initialized Level‑ 0 processor.
 
         Notes
         -----
-        The Level‑0 dataset is loaded from disk and stored as `self.dataset`.
+        The Level‑ 0 dataset is loaded from disk and stored as `self.dataset`.
         """
         self.ifs_level_zero = ifs_level_zero
 
@@ -163,6 +162,8 @@ class IFSLevelOne:
         self.dataset = CalcUtils.calculate_k_index(self.dataset)
         self.dataset = CalcUtils.calculate_tt_index(self.dataset)
         self.dataset = CalcUtils.calculate_li(self.dataset)
+
+        return None
 
     def export_ifs_level_one_ds(self) -> None:
         """

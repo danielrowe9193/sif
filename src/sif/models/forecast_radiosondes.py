@@ -1,9 +1,9 @@
 import numpy as np
 import xarray as xr
 
-from config import Constants
+from src.sif.utils.config import Constants
 from pathlib import Path
-from utils import CalcUtils, FileManagement
+from src.sif.utils.utils import CalcUtils, FileManagement
 
 xr.set_options(use_new_combine_kwarg_defaults=True)
 

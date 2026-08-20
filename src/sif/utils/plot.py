@@ -5,7 +5,7 @@ import xarray as xr
 from metpy.plots import Hodograph, SkewT
 from metpy.units import units
 from pathlib import Path
-from utils import FileManagement
+from .utils import FileManagement
 
 
 class FehmarnRadiosondeProfilePlotter:

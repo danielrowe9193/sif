@@ -244,7 +244,7 @@ class FileManagement:
     """Utilities for handling files gathered during the experiment."""
 
     PACKAGE_DIR = Path(__file__).resolve().parent
-    PROJECT_DIR = PACKAGE_DIR.parent.parent
+    PROJECT_DIR = PACKAGE_DIR.parent.parent.parent
 
     DATA_DIR = PROJECT_DIR / "data/"
     PLOT_DIR = PROJECT_DIR / "plots/"

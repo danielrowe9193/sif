@@ -1,6 +1,6 @@
 import numpy as np
 import pandas as pd
-import utils
+import src.sif.utils as utils
 import xarray as xr
 import xml.etree.ElementTree as ET
 import zipfile

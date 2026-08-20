@@ -51,7 +51,7 @@ BASE_PATH = Path(__file__).resolve().parent.parent.parent / "data" / "IFS"
 
 for cycle in cycles:
     input_folder = BASE_PATH / date_input / f"{cycle}z" / "ifs" 
-    output_folder = BASE_PATH / date_input / "netCDF" / f"{cycle}z" 
+    output_folder = BASE_PATH / date_input / "netCDF"  
     output_folder.mkdir(parents=True, exist_ok=True)
 
     # concat by station to each cycle

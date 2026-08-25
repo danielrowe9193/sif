@@ -211,13 +211,66 @@ class Radiosondes:
             radiosonde_list.append(rs)
 
         return radiosonde_list
+    
+    def iter_radiosondes(self):
+        """
+        Yield Radiosonde objects one by one.
+        
+        The advantage is that each radiosonde is loaded into memory only one time,
+        instead of the entire list of radiosondes being loaded.
+        """
+        
+        for file in self.mwx_dir.glob("*.mwx"):
+            yield Radiosonde(filepath=file)
 
 
 class RadiosondesLevel0:
     """
-
+    Initial radiosonde dataset.
+    Produces a combined xarray dataset.
+    Radiosondes are interpolated onto a common pressure grid from
+    1000 hPa to 10 hPa.
+    
+    Produces radiosondes.level0.nc and std_plvl_radiosondes.level0.nc.
     """
-
+    
+    PRESSURE_GRID = np.arange(1000, 9, -1)
+    
+    def __init__(self, radiosondes: Radiosondes):
+        
+        self.radiosondes = radiosondes
+    
+    def build_ptu_radiosondes_lvl0(self) -> xr.Dataset:
+        """Interpolate to 1000–10 hPa grid, harmonize coordinates."""
+        
+        ptu_radiosonde_ds_list = []
+        
+        for index, radiosonde in enumerate(self.radiosondes.iter_radiosondes()):
+            ptu_radiosonde_ds = PTURadiosonde(radiosonde).build_dataset()
+            ptu_radiosonde_ds = ptu_radiosonde_ds.interp(p=self.PRESSURE_GRID)
+            ptu_radiosonde_ds_list.append(ptu_radiosonde_ds)
+        
+        ptu_radiosonde_ds = xr.concat(
+            ptu_radiosonde_ds_list, dim="sounding_num", join="outer"
+        )
+        
+        return ptu_radiosonde_ds        
+            
+    def build_std_plvl_radiosondes_lvl0(self) -> xr.Dataset:
+        """Harmonize coordinates."""
+        
+        std_plvl_radiosonde_ds_list = []
+    
+        for index, radiosonde in enumerate(self.radiosondes.iter_radiosondes()):
+                    std_plvl_radiosonde_ds = StdPressureRadiosonde(radiosonde).build_dataset()
+                    std_plvl_radiosonde_ds = std_plvl_radiosonde_ds.interp(p=self.PRESSURE_GRID)
+                    std_plvl_radiosonde_ds_list.append(std_plvl_radiosonde_ds)
+                
+        std_plvl_radiosonde_ds = xr.concat(
+            std_plvl_radiosonde_ds_list, dim="sounding_num", join="outer"
+        )
+        
+        return std_plvl_radiosonde_ds
 
 
 # class Radiosonde:

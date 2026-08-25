@@ -262,9 +262,9 @@ class RadiosondesLevel0:
         std_plvl_radiosonde_ds_list = []
     
         for index, radiosonde in enumerate(self.radiosondes.iter_radiosondes()):
-                    std_plvl_radiosonde_ds = StdPressureRadiosonde(radiosonde).build_dataset()
-                    std_plvl_radiosonde_ds = std_plvl_radiosonde_ds.interp(p=self.PRESSURE_GRID)
-                    std_plvl_radiosonde_ds_list.append(std_plvl_radiosonde_ds)
+            std_plvl_radiosonde_ds = StdPressureRadiosonde(radiosonde).build_dataset()
+            std_plvl_radiosonde_ds = std_plvl_radiosonde_ds.interp(p=self.PRESSURE_GRID)
+            std_plvl_radiosonde_ds_list.append(std_plvl_radiosonde_ds)
                 
         std_plvl_radiosonde_ds = xr.concat(
             std_plvl_radiosonde_ds_list, dim="sounding_num", join="outer"

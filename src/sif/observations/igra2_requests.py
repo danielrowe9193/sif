@@ -117,30 +117,42 @@ def get_station_ids(
     return list(df[mask]["station_id"])
 
 
-def download_soundings(station_ids: list[str]) -> None:
+def download_soundings(station_ids: list[str], derived: bool = True) -> None:
     """This function downloads the sounding data for a given list of station ids."""
-    all_sounding_data_url = "https://www.ncei.noaa.gov/data/integrated-global-radiosonde-archive/access/data-por/"
+
+    base_url = "https://www.ncei.noaa.gov/data/integrated-global-radiosonde-archive/access/"
+
+    FileManagement.IGRA_DIR.mkdir(exist_ok=True, parents=True)
 
     for station_id in station_ids:
-        zip_file = Path(f"{station_id}-data.txt.zip")
-        data_url = all_sounding_data_url + zip_file.name
 
-        FileManagement.IGRA_DIR.mkdir(exist_ok=True, parents=True)
+        data_types = ['data']
 
-        print(f"Downloading: {zip_file} ...")
+        if derived:
+            data_types.append('drvd')
 
-        response = requests.get(data_url)
+        for data_type in data_types:
 
-        if response.status_code == 200:
+            directory = "data-por" if data_type == "data" else "derived-por"
 
-            output_dir = FileManagement.IGRA_DIR / zip_file
+            zip_file = Path(f"{station_id}-{data_type}.txt.zip")
+            data_url = f"{base_url}{directory}/{zip_file.name}"
 
-            with open(f'{output_dir}', 'wb') as zf:
-                zf.write(response.content)
+            print(f"Downloading: {zip_file} ...")
+
+            response = requests.get(data_url)
+
+            if response.status_code == 200:
+
+                output_file = FileManagement.IGRA_DIR / zip_file
+
+                with open(output_file, "wb") as zf:
+                    zf.write(response.content)
+
                 print("Successfully downloaded!\n")
 
-        else:
-            print(f"Could not download {zip_file}; response code: {response.status_code}.")
+            else:
+                print(f"Could not download {zip_file}; response code: {response.status_code}.")
 
 
 def main():

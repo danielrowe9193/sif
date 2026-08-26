@@ -46,6 +46,86 @@ def _parse_level(line: list) -> dict:
     }
 
 
+def _parse_derived_header(line: list) -> dict:
+    """Parse one IGRA derived index using the Header Record Format from
+    https://www.ncei.noaa.gov/data/integrated-global-radiosonde-archive/doc/igra2-derived-format.txt."""
+
+    return {
+        "station": line[1:12].strip(),
+
+        "year": int(line[13:17]),
+        "month": int(line[18:20]),
+        "day": int(line[21:23]),
+        "hour": int(line[24:26]),
+
+        "numlev": int(line[31:36]),
+
+        "pw": int(line[37:43]),
+        "inversion_pressure": int(line[43:49]),
+        "inversion_height": int(line[49:55]),
+        "inversion_temperature_difference": int(line[55:61]),
+
+        "mixed_layer_pressure": int(line[61:67]),
+        "mixed_layer_height": int(line[67:73]),
+
+        "freezing_pressure": int(line[73:79]),
+        "freezing_height": int(line[79:85]),
+
+        "lcl_pressure": int(line[85:91]),
+        "lcl_height": int(line[91:97]),
+
+        "lfc_pressure": int(line[97:103]),
+        "lfc_height": int(line[103:109]),
+
+        "lnb_pressure": int(line[109:115]),
+        "lnb_height": int(line[115:121]),
+
+        "lifted_index": int(line[121:127]),
+        "showalter_index": int(line[127:133]),
+        "k_index": int(line[133:139]),
+        "total_totals_index": int(line[139:145]),
+
+        "cape": int(line[145:151]),
+        "cin": int(line[151:157]),
+    }
+
+
+def _parse_derived_level(line: str) -> dict:
+    """Parse one IGRA derived profile line using the Data Record Format from
+    https://www.ncei.noaa.gov/data/integrated-global-radiosonde-archive/doc/igra2-derived-format.txt."""
+
+    return {
+        "pressure": int(line[0:7]),
+
+        "reported_geopotential_height": int(line[8:15]),
+        "calculated_geopotential_height": int(line[16:23]),
+
+        "temperature": int(line[24:31]),
+        "temperature_gradient": int(line[32:39]),
+
+        "potential_temperature": int(line[40:47]),
+        "potential_temperature_gradient": int(line[48:55]),
+
+        "virtual_temperature": int(line[56:63]),
+        "virtual_potential_temperature": int(line[64:71]),
+
+        "vapor_pressure": int(line[72:79]),
+        "saturation_vapor_pressure": int(line[80:87]),
+
+        "reported_relative_humidity": int(line[88:95]),
+        "calculated_relative_humidity": int(line[96:103]),
+        "relative_humidity_gradient": int(line[104:111]),
+
+        "u_wind": int(line[112:119]),
+        "u_wind_gradient": int(line[120:127]),
+
+        "v_wind": int(line[128:135]),
+        "v_wind_gradient": int(line[136:143]),
+
+        "refractive_index": int(line[144:151]),
+    }
+
+
 # Parse the entire file.
 def parse_soundings(lines: list[str]) -> dict[pd.Timestamp, pd.DataFrame]:
     """

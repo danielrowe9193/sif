@@ -65,37 +65,35 @@ class CalcUtils:
         return profile
 
     @staticmethod
-    def calculate_td_from_rh(profile: xr.Dataset | xr.DataTree):
+    def calculate_td_from_rh(radiosonde_dataset: xr.Dataset | xr.DataTree) -> xr.Dataset:
+        """
+        Calculates dewpoint temperatures for every radiosonde in the dataset.
 
-        ta = profile['ta']
-        print(ta, ta.shape)
-        ta = ta.transpose()
-        print(ta, ta.shape)
-        rh = profile['rh']
-        print(rh, rh.shape)
+        Requires that the vertical coordinate is labelled 'p'.
+        :param radiosonde_dataset: The dataset containing air temperature and relative humidity values with the required shape.
+        :return: Updated dataset containing dewpoint temperatures as a variable 'td'
+        """
 
-        def td(ta, rh):
-            ta = ta * units.kelvin
-            rh = rh * units.percent
+        radiosonde_dataset = radiosonde_dataset.copy()
 
-            td = (mpcalc.dewpoint_from_relative_humidity(ta, rh)).to(units.kelvin)
+        air_temp = radiosonde_dataset['ta'].data * units.kelvin
+        rel_humi = radiosonde_dataset['rh'].data * units.percent
 
-            return td.magnitude
+        dew_temp = mpcalc.dewpoint_from_relative_humidity(
+            air_temp, rel_humi
+        ).to(units.kelvin)
 
-        t_d = xr.apply_ufunc(
-            td,
-            ta,
-            rh,
-            input_core_dims=[["p"], ["p"]],
-            output_core_dims=[['p']],
-            vectorize=True,
-            dask="parallelized",
-            output_dtypes=[float],
+        radiosonde_dataset["td"] = xr.DataArray(
+            dew_temp.magnitude,
+            dims=radiosonde_dataset["ta"].dims,
+            coords=radiosonde_dataset["ta"].coords,
+            attrs={
+                "long_name": "Dewpoint temperature",
+                "units": "K",
+            },
         )
 
-        profile['td'] = t_d
-
-        return profile
+        return radiosonde_dataset
 
     @staticmethod
     def calculate_cape(profile: xr.Dataset | xr.DataTree):
@@ -159,13 +157,21 @@ class CalcUtils:
         cape = xr.DataArray(
             cape_list,
             dims=["sounding_num"],
-            coords={"sounding_num": profile.sounding_num}
+            coords={"sounding_num": profile.sounding_num},
+            attrs={
+                "long_name": "Convective Available Potential Energy",
+                "units": "J/Kg",
+            },
         )
 
         cin = xr.DataArray(
             cin_list,
             dims=["sounding_num"],
-            coords={"sounding_num": profile.sounding_num}
+            coords={"sounding_num": profile.sounding_num},
+            attrs={
+                "long_name": "Convective Inhibition",
+                "units": "J/Kg",
+            },
         )
 
         profile["cape"] = cape

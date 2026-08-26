@@ -86,16 +86,17 @@ class StdPressureRadiosonde:
 
         self.data = [
             {
-                "RadioRxTimePk": row.get("RadioRxTimePk"),
+                "RadioRxTime": float(row.get("RadioRxTime")),
                 "sounding_id": row.get("SoundingIdPk"),
                 "time": row.get("DataSrvTime"),
                 "height": float(row.get("Height")),
                 "p": float(row.get("PressurePk")),
-                "h": float(row.get("Height")),
                 "ta": float(row.get("Temperature")),
                 "rh": float(row.get("Humidity")),
                 "wdir": float(row.get("WindDirection")),
                 "wspeed": float(row.get("WindSpeed")),
+                "lat": float(row.get("Latitude")),
+                "lon": float(row.get("Longitude"))
             }
             for row in self.root.findall("Row")
         ]
@@ -125,7 +126,6 @@ class StdPressureRadiosonde:
         """
 
         df = pd.DataFrame(self.data)
-        df = df.set_index("height")
 
         self.sounding_id = df["sounding_id"].iloc[0]
 
@@ -144,7 +144,7 @@ class PTURadiosonde:
 
     def __init__(self, radiosonde: Radiosonde):
         self.radiosonde = radiosonde
-        self.root = self.radiosonde.get_xml_tree("StdPressureLevels.xml").getroot()
+        self.root = self.radiosonde.get_xml_tree("SynchronizedSoundingData.xml").getroot()
 
         self.data = [
             {
@@ -152,6 +152,7 @@ class PTURadiosonde:
                 "height": float(row.get("Height")),
                 "geometric_height": float(row.get("GeometricHeight")),
                 "p": float(row.get("Pressure")),
+                "time": row.get("DataSrvTime"),
                 "ta": float(row.get("Temperature")),
                 "rh": float(row.get("Humidity")),
                 "wdir": float(row.get("WindDir")),
@@ -161,11 +162,10 @@ class PTURadiosonde:
                 "lat": float(row.get("Latitude")),
                 "lon": float(row.get("Longitude")),
                 "sounding_id": row.get("SoundingIdPk"),
-                "time": row.get("DataSrvTime"),
+
             }
             for row in self.root.findall("Row")
         ]
-
         self.sounding_id: str | None = None
 
     def build_dataset(self) -> xr.Dataset:
@@ -187,6 +187,11 @@ class PTURadiosonde:
         df = df.drop(columns="sounding_id").set_index("p")
 
         ds = df.to_xarray().sortby("p", ascending=False)
+
+        # ds['time'] = xr.apply_ufunc(
+        #     pd.to_datetime,
+        #     ds['time']
+        # )
 
         return ds
 
@@ -217,7 +222,8 @@ class Radiosondes:
         Yield Radiosonde objects one by one.
         
         The advantage is that each radiosonde is loaded into memory only one time,
-        instead of the entire list of radiosondes being loaded.
+        instead of the entire list of radiosondes being loaded. This improves scalability
+        of script.
         """
         
         for file in self.mwx_dir.glob("*.mwx"):
@@ -239,6 +245,9 @@ class RadiosondesLevel0:
     def __init__(self, radiosondes: Radiosondes):
         
         self.radiosondes = radiosondes
+
+        self.ptu_radiosonde_ds: xr.Dataset | None = None
+        self.std_plvl_radiosonde_ds: xr.Dataset | None = None
     
     def build_ptu_radiosondes_lvl0(self) -> xr.Dataset:
         """Interpolate to 1000–10 hPa grid, harmonize coordinates."""
@@ -253,24 +262,160 @@ class RadiosondesLevel0:
         ptu_radiosonde_ds = xr.concat(
             ptu_radiosonde_ds_list, dim="sounding_num", join="outer"
         )
+
+        self.ptu_radiosonde_ds = ptu_radiosonde_ds
         
         return ptu_radiosonde_ds        
             
     def build_std_plvl_radiosondes_lvl0(self) -> xr.Dataset:
-        """Harmonize coordinates."""
+        """
+        Builds a dataset for standard pressure level radiosondes.
+
+        Harmonizes coordinates and interpolates onto the common pressure grid.
+        :return:
+        """
         
         std_plvl_radiosonde_ds_list = []
     
         for index, radiosonde in enumerate(self.radiosondes.iter_radiosondes()):
             std_plvl_radiosonde_ds = StdPressureRadiosonde(radiosonde).build_dataset()
-            std_plvl_radiosonde_ds = std_plvl_radiosonde_ds.interp(p=self.PRESSURE_GRID)
             std_plvl_radiosonde_ds_list.append(std_plvl_radiosonde_ds)
                 
         std_plvl_radiosonde_ds = xr.concat(
             std_plvl_radiosonde_ds_list, dim="sounding_num", join="outer"
         )
+
+        std_plvl_radiosonde_ds = std_plvl_radiosonde_ds.sortby(
+            'p', ascending=False
+        )
+
+        self.std_plvl_radiosonde_ds = std_plvl_radiosonde_ds
         
         return std_plvl_radiosonde_ds
+
+
+class RadiosondesLevel1:
+    """
+    Level 1 Processing of radiosonde dataset.
+
+    Removes bad radiosondes and applies quality control.
+    """
+
+    BAD_SOUNDING_INDICES = [0, 10]
+
+    def __init__(self, radiosondes_lvl0: RadiosondesLevel0):
+        """
+
+        :param radiosondes_lvl0:
+        """
+
+        self.radiosondes_lvl0 = radiosondes_lvl0
+
+        self.ptu_radiosonde_ds: xr.Dataset | None = None
+        self.std_plvl_radiosonde_ds: xr.Dataset | None = None
+
+    def build_ptu_radiosondes_lvl1(self):
+        """
+        Constructs the level 1 dataset.
+
+        Removes the bad radiosondes from the dataset.
+        :return:
+        """
+
+        # Drop bad radiosondes
+        ptu_radiosonde_ds = self.radiosondes_lvl0.ptu_radiosonde_ds.drop_isel(
+            sounding_num=self.BAD_SOUNDING_INDICES
+        )
+
+        ptu_radiosonde_ds['rh'] = ptu_radiosonde_ds['rh'].where(
+            (ptu_radiosonde_ds['rh'] >= 0) &
+            (ptu_radiosonde_ds['rh'] <= 1.1),
+            np.nan
+        )
+
+        ptu_radiosonde_ds = ptu_radiosonde_ds.assign_coords(
+            launch_time=(
+                'sounding_num', ptu_radiosonde_ds['time'].isel(p=0).data
+            )
+        )
+
+        self.ptu_radiosonde_ds = ptu_radiosonde_ds
+
+        return ptu_radiosonde_ds
+
+    def build_std_plvl_radiosondes_lvl1(self):
+        """
+        Construct level 1 dataset on standard pressure levels.
+
+        Removes bad radiosondes from the dataset.
+        :return:
+        """
+
+        std_plvl_radiosonde_ds = self.radiosondes_lvl0.std_plvl_radiosonde_ds.drop_isel(
+            sounding_num=self.BAD_SOUNDING_INDICES
+        )
+
+        std_plvl_radiosonde_ds['rh'] = std_plvl_radiosonde_ds['rh'].where(
+            (std_plvl_radiosonde_ds['rh'] >= 0) &
+            (std_plvl_radiosonde_ds['rh'] <= 1.1),
+            np.nan
+        )
+
+        std_plvl_radiosonde_ds = std_plvl_radiosonde_ds.assign_coords(
+            launch_time=(
+                'sounding_num', std_plvl_radiosonde_ds['time'].isel(p=0).data
+            )
+        )
+
+        self.std_plvl_radiosonde_ds = std_plvl_radiosonde_ds
+
+        return std_plvl_radiosonde_ds
+
+
+class RadiosondesLevel2:
+
+    def __init__(self, radiosondes_lvl1: RadiosondesLevel1):
+
+        self.radiosondes_lvl1 = radiosondes_lvl1
+
+        self.ptu_radiosonde_ds: xr.Dataset | None = None
+        self.std_plvl_radiosonde_ds: xr.Dataset | None = None
+
+    def build_ptu_radiosondes_lvl2(self):
+        """
+        Constructs the level 2 dataset.
+
+        Perform relevant calculations.
+        :return:
+        """
+
+        # Perform calculations
+        self.ptu_radiosonde_ds = utils.CalcUtils.calculate_td_from_rh(self.radiosondes_lvl1.ptu_radiosonde_ds)
+
+        # self.ptu_radiosonde_ds = utils.CalcUtils.calculate_cape(self.ptu_radiosonde_ds)
+        # self.ptu_radiosonde_ds = utils.CalcUtils.calculate_tt_index(self.ptu_radiosonde_ds)
+        # self.ptu_radiosonde_ds = utils.CalcUtils.calculate_k_index(self.ptu_radiosonde_ds)
+        # self.ptu_radiosonde_ds = utils.CalcUtils.calculate_li(self.ptu_radiosonde_ds)
+
+        return self.ptu_radiosonde_ds
+
+    def build_std_plvl_radiosondes_lvl2(self):
+        """
+        Construct level 1 dataset on standard pressure levels.
+
+        Removes bad radiosondes from the dataset.
+        :return:
+        """
+
+        # Perform calculations
+        self.std_plvl_radiosonde_ds = utils.CalcUtils.calculate_td_from_rh(self.radiosondes_lvl1.std_plvl_radiosonde_ds)
+
+        # self.std_plvl_radiosonde_ds = utils.CalcUtils.calculate_cape(self.std_plvl_radiosonde_ds)
+        # self.std_plvl_radiosonde_ds = utils.CalcUtils.calculate_tt_index(self.std_plvl_radiosonde_ds)
+        # self.std_plvl_radiosonde_ds = utils.CalcUtils.calculate_k_index(self.std_plvl_radiosonde_ds)
+        # self.std_plvl_radiosonde_ds = utils.CalcUtils.calculate_li(self.std_plvl_radiosonde_ds)
+
+        return self.std_plvl_radiosonde_ds
 
 
 # class Radiosonde:

@@ -77,11 +77,14 @@ def get_station_ids(
         df: pd.DataFrame
             DataFrame containing IGRA2 stations data.
 
-        value: str, optional
+        value: str, Optional
             Search value. The value is searched for across all columns.
             Matching is case-insensitive and allows partial matches.
 
-        region_mask : pandas.Series, optional
+        col: str, Optional
+            Column of the dataframe to be searched.
+
+        region_mask : pandas.Series, Optional
             Boolean mask selecting stations within a region.
 
     Notes:
@@ -99,6 +102,7 @@ def get_station_ids(
                 case=False,
                 na=False,
             )
+
         else:
             mask = df.astype(str).apply(
                 lambda column: column.str.contains(

@@ -65,6 +65,39 @@ class CalcUtils:
         return profile
 
     @staticmethod
+    def calculate_td_from_rh(profile: xr.Dataset | xr.DataTree):
+
+        ta = profile['ta']
+        print(ta, ta.shape)
+        ta = ta.transpose()
+        print(ta, ta.shape)
+        rh = profile['rh']
+        print(rh, rh.shape)
+
+        def td(ta, rh):
+            ta = ta * units.kelvin
+            rh = rh * units.percent
+
+            td = (mpcalc.dewpoint_from_relative_humidity(ta, rh)).to(units.kelvin)
+
+            return td.magnitude
+
+        t_d = xr.apply_ufunc(
+            td,
+            ta,
+            rh,
+            input_core_dims=[["p"], ["p"]],
+            output_core_dims=[['p']],
+            vectorize=True,
+            dask="parallelized",
+            output_dtypes=[float],
+        )
+
+        profile['td'] = t_d
+
+        return profile
+
+    @staticmethod
     def calculate_cape(profile: xr.Dataset | xr.DataTree):
         """
         Calculate CAPE and CIN from a collection of soundings.
@@ -82,31 +115,57 @@ class CalcUtils:
             with dimension (sounding_id,).
         """
 
-        p = profile["p"]
-        t = profile["ta"]
-        td = profile["td"]
+        cape_list = []
+        cin_list = []
 
-        def cape_cin(p, t, td):
-            p = p * units.hPa
-            t = t * units.kelvin
-            td = td * units.kelvin
+        for sounding_num in profile.sounding_num.values:
 
-            parcel = mpcalc.parcel_profile(p, t[0], td[0]).to("degC")
+            try:
+                radiosonde = profile.sel(sounding_num=sounding_num)
 
-            cape, cin = mpcalc.cape_cin(p, t.to("degC"), td.to("degC"), parcel)
+                p = radiosonde["p"].values * units.hPa
+                t = radiosonde["ta"].values * units.kelvin
+                td = radiosonde["td"].values * units.kelvin
 
-            return cape.magnitude, cin.magnitude
+                # Calculate parcel profile
+                parcel = mpcalc.parcel_profile(
+                    p,
+                    t[0],
+                    td[0]
+                ).to("degC")
 
-        cape, cin = xr.apply_ufunc(
-            cape_cin,
-            p,
-            t,
-            td,
-            input_core_dims=[["p"], ["p"], ["p"]],
-            output_core_dims=[[], []],
-            vectorize=True,
-            dask="parallelized",
-            output_dtypes=[float, float],
+                # Calculate CAPE and CIN
+                cape, cin = mpcalc.cape_cin(
+                    p,
+                    t.to("degC"),
+                    td.to("degC"),
+                    parcel
+                )
+
+                cape_list.append(cape.magnitude)
+                cin_list.append(cin.magnitude)
+
+            except Exception as e:
+
+                print(
+                    f"CAPE/CIN calculation failed for "
+                    f"sounding {sounding_num}: {e}"
+                )
+
+                cape_list.append(np.nan)
+                cin_list.append(np.nan)
+
+        # Convert results back into xarray
+        cape = xr.DataArray(
+            cape_list,
+            dims=["sounding_num"],
+            coords={"sounding_num": profile.sounding_num}
+        )
+
+        cin = xr.DataArray(
+            cin_list,
+            dims=["sounding_num"],
+            coords={"sounding_num": profile.sounding_num}
         )
 
         profile["cape"] = cape
@@ -117,9 +176,11 @@ class CalcUtils:
     @staticmethod
     def calculate_k_index(profile: xr.Dataset | xr.DataTree):
 
-        p = profile["p"]
-        t = profile["ta"]
-        td = profile["td"]
+        p, t, td = xr.broadcast(
+            profile["p"],
+            profile["ta"],
+            profile["td"]
+        )
 
         def k_index(p, t, td):
             p = p * units.hPa
@@ -146,9 +207,11 @@ class CalcUtils:
 
     @staticmethod
     def calculate_tt_index(profile: xr.Dataset | xr.DataTree):
-        p = profile["p"]
-        t = profile["ta"]
-        td = profile["td"]
+        p, t, td = xr.broadcast(
+            profile["p"],
+            profile["ta"],
+            profile["td"]
+        )
 
         def tt_index(p, t, td):
             p = p * units.hPa

@@ -374,6 +374,10 @@ class RadiosondesLevel1:
 
 class RadiosondesLevel2:
 
+    """
+    Handles all computed variables and calculates stability indices for each radiosonde.
+    """
+
     def __init__(self, radiosondes_lvl1: RadiosondesLevel1):
 
         self.radiosondes_lvl1 = radiosondes_lvl1
@@ -416,3 +420,80 @@ class RadiosondesLevel2:
         self.std_plvl_radiosonde_ds = utils.CalcUtils.calculate_li(self.std_plvl_radiosonde_ds)
 
         return self.std_plvl_radiosonde_ds
+
+
+class RadiosondesLevel3:
+    """
+    Radiosondes from the 3 other stations combined with Fehmarn
+    observations.
+    """
+    ...
+
+
+class RadiosondePipeline:
+    """
+    Orchestrates the full workflow:
+        Radiosondes → PTU/StdPressure → Level0 → Level1 → Level2
+    In the future Level3 radiosondes will be added to the pipeline.
+    """
+
+    def __init__(self, mwx_dir: str | Path):
+        self.collection = Radiosondes(mwx_dir)
+
+    def run_ptu_pipeline(self):
+        """Run PTU radiosondes through Level0 → Level1 → Level2."""
+
+        lvl0 = RadiosondesLevel0(
+            radiosondes=self.collection
+        )
+        lvl0.build_ptu_radiosondes_lvl0()
+        lvl0.ptu_radiosonde_ds.to_netcdf(
+            utils.FileManagement.NETCDF_DIR / "sif.ptu_radiosondes.profiles.level0.nc"
+        )
+
+        lvl1 = RadiosondesLevel1(
+            radiosondes_lvl0=lvl0
+        )
+        lvl1.build_ptu_radiosondes_lvl1()
+        lvl1.ptu_radiosonde_ds.to_netcdf(
+            utils.FileManagement.NETCDF_DIR / "sif.ptu_radiosondes.profiles.level1.nc"
+        )
+
+        lvl2 = RadiosondesLevel2(
+            radiosondes_lvl1=lvl1
+        )
+        lvl2.build_ptu_radiosondes_lvl2()
+        lvl2.ptu_radiosonde_ds.to_netcdf(
+            utils.FileManagement.NETCDF_DIR / "sif.ptu_radiosondes.profiles.level2.nc"
+        )
+
+        return None
+
+    def run_std_plvl_pipeline(self):
+        """Run StdPressure radiosondes through Level0 → Level1 → Level2."""
+
+        lvl0 = RadiosondesLevel0(
+            radiosondes=self.collection
+        )
+        lvl0.build_std_plvl_radiosondes_lvl0()
+        lvl0.std_plvl_radiosonde_ds.to_netcdf(
+            utils.FileManagement.NETCDF_DIR / "sif.std_plvl_radiosondes.profiles.level0.nc"
+        )
+
+        lvl1 = RadiosondesLevel1(
+            radiosondes_lvl0=lvl0
+        )
+        lvl1.build_std_plvl_radiosondes_lvl1()
+        lvl1.std_plvl_radiosonde_ds.to_netcdf(
+            utils.FileManagement.NETCDF_DIR / "sif.std_plvl_radiosondes.profiles.level1.nc"
+        )
+
+        lvl2 = RadiosondesLevel2(
+            radiosondes_lvl1=lvl1
+        )
+        lvl2.build_std_plvl_radiosondes_lvl2()
+        lvl2.std_plvl_radiosonde_ds.to_netcdf(
+            utils.FileManagement.NETCDF_DIR / "sif.std_plvl_radiosondes.profiles.level2.nc"
+        )
+
+        return None

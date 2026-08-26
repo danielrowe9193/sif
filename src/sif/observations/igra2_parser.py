@@ -52,16 +52,14 @@ def parse_soundings(lines: list[str]) -> dict[pd.Timestamp, pd.DataFrame]:
     Parse an IGRA station file into a dictionary of soundings.
 
     Parameters
-    ----------
-    lines : list[str]
-        List of lines from an IGRA station file.
+        lines : list[str]
+            List of lines from an IGRA station file.
 
     Returns
-    -------
-    dict[pandas.Timestamp, pandas.DataFrame]
-        Dictionary whose keys are launch datetimes and whose values are
-        DataFrames containing the sounding profile. The header metadata
-        are stored in each DataFrame's ``attrs`` dictionary.
+        dict[pandas.Timestamp, pandas.DataFrame]
+            Dictionary whose keys are launch datetimes and whose values are
+            DataFrames containing the sounding profile. The header metadata
+            are stored in each DataFrame's ``attrs`` dictionary.
     """
 
     soundings = {}

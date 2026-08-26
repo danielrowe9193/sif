@@ -190,6 +190,85 @@ def parse_soundings(lines: list[str]) -> dict[pd.Timestamp, pd.DataFrame]:
     return soundings
 
 
+def parse_derived_soundings(lines: list[str]) -> dict[pd.Timestamp, pd.DataFrame]:
+    """
+    Parse an IGRA station file into a dictionary of soundings.
+
+    Parameters
+        lines : list[str]
+            List of lines from an IGRA station file.
+
+    Returns
+        dict[pandas.Timestamp, pandas.DataFrame]
+            Dictionary whose keys are launch datetimes and whose values are
+            DataFrames containing the sounding profile. The header metadata
+            are stored in each DataFrame's ``attrs`` dictionary.
+    """
+
+    soundings = {}
+
+    line_number = 0
+
+    # Loop through each profile associated with each heading.
+    while line_number < len(lines):
+
+        # Skip if line is not a header.
+        if not lines[line_number].startswith("#"):
+            line_number += 1
+            continue
+
+        header = _parse_derived_header(lines[line_number])
+
+        profile = []
+
+        for sounding_level in range(header["numlev"]):
+
+            profile.append(_parse_derived_level(lines[line_number + sounding_level + 1]))
+
+        df = pd.DataFrame(profile)
+
+        # Replace IGRA missing values with NaN.
+        df.replace(-99999, np.nan, inplace=True)
+
+        # Convert units.
+        df["temperature"] /= 10.0
+        df["temperature_gradient"] /= 10.0              # K/km
+
+        df["potential_temperature"] /= 10.0
+        df["potential_temperature_gradient"] /= 10.0    # K/km
+
+        df["virtual_temperature"] /= 10.0
+        df["virtual_potential_temperature"] /= 10.0     # K/km
+
+        df["vapor_pressure"] /= 10.0
+        df["saturation_vapor_pressure"] /= 10.0
+
+        df["reported_relative_humidity"] /= 10.0
+        df["calculated_relative_humidity"] /= 10.0
+        df["relative_humidity_gradient"] /= 10          # %/km
+
+        df["u_wind"] /= 10.0
+        df["u_wind_gradient"] /= 10                     # m/s/km
+
+        df["v_wind"] /= 10.0
+        df["v_wind_gradient"] /= 10                     # m/s/km
+
+        dt = pd.Timestamp(
+            year=header["year"],
+            month=header["month"],
+            day=header["day"],
+            hour=header["hour"],
+        )
+
+        df.attrs = header
+
+        soundings[dt] = df
+
+        line_number += header["numlev"] + 1
+
+    return soundings
+
+
 def soundings_to_xarray(soundings: dict[pd.Timestamp, pd.DataFrame]) -> xr.Dataset:
     """
     Convert a dictionary of IGRA soundings into an xarray Dataset.
@@ -290,29 +369,269 @@ def soundings_to_xarray(soundings: dict[pd.Timestamp, pd.DataFrame]) -> xr.Datas
     return ds
 
 
-ROOT = Path(__file__).resolve().parents[2]
-DATA_DIR = Path("data")
-ZIP_DIR = ROOT / DATA_DIR
+def derived_soundings_to_xarray(soundings: dict[pd.Timestamp, pd.DataFrame]) -> xr.Dataset:
+    """
+    Convert a dictionary of IGRA derived quantities into an xarray Dataset.
 
-filename = "BBM00078954-data.txt.zip"
-zip_file = ZIP_DIR / filename
+    Parameters
+        soundings : dict[pd.Timestamp, pd.DataFrame]. This is generated using parse_soundings.
+
+    Returns
+        xr.Dataset for each derived sounding sorted by timestamp.
+    """
+
+    # Sort chronologically
+    times = sorted(soundings.keys())
+
+    ntime = len(times)
+    max_levels = max(len(soundings[t]) for t in times)
+
+    profile_vars = [
+        "pressure",
+        "reported_geopotential_height",
+        "calculated_geopotential_height",
+        "temperature",
+        "temperature_gradient",
+        "potential_temperature",
+        "potential_temperature_gradient",
+        "virtual_temperature",
+        "virtual_potential_temperature",
+        "vapor_pressure",
+        "saturation_vapor_pressure",
+        "reported_relative_humidity",
+        "calculated_relative_humidity",
+        "relative_humidity_gradient",
+        "u_wind",
+        "u_wind_gradient",
+        "v_wind",
+        "v_wind_gradient",
+        "refractive_index",
+    ]
+
+    # Initialize metadata arrays for profiles with NaN values. (e.g. pressure, temp)
+    arrays = {
+        var: np.full((ntime, max_levels), np.nan)
+        for var in profile_vars
+    }
+
+    # Initialize metadata with one value per sounding. (e.g. lat, lon, launch time)
+    pw = np.full(ntime, np.nan)
+
+    inversion_pressure = np.full(ntime, np.nan)
+    inversion_height = np.full(ntime, np.nan)
+
+    mixed_layer_pressure = np.full(ntime, np.nan)
+    mixed_layer_height = np.full(ntime, np.nan)
+
+    freezing_pressure = np.full(ntime, np.nan)
+    freezing_height = np.full(ntime, np.nan)
+
+    lcl_pressure = np.full(ntime, np.nan)
+    lcl_height = np.full(ntime, np.nan)
+
+    lfc_pressure = np.full(ntime, np.nan)
+    lfc_height = np.full(ntime, np.nan)
+
+    lnb_pressure = np.full(ntime, np.nan)
+    lnb_height = np.full(ntime, np.nan)
+
+    lifted_index = np.full(ntime, np.nan)
+    showalter_index = np.full(ntime, np.nan)
+    k_index = np.full(ntime, np.nan)
+    total_totals_index = np.full(ntime, np.nan)
+
+    cape = np.full(ntime, np.nan)
+    cin = np.full(ntime, np.nan)
+
+    # Loop through soundings to fill arrays.
+    for i, time in enumerate(times):
+
+        df = soundings[time]
+
+        n = len(df)
+
+        # Fill the arrays.
+        for var in profile_vars:
+
+            if var in df.columns:
+                arrays[var][i, :n] = df[var].values
+
+        # Metadata from header.
+        attrs = df.attrs
+
+        pw[i] = attrs["pw"]
+
+        inversion_pressure[i] = attrs["inversion_pressure"]
+        inversion_height[i] = attrs["inversion_height"]
+
+        mixed_layer_pressure[i] = attrs["mixed_layer_pressure"]
+        mixed_layer_height[i] = attrs["mixed_layer_height"]
+
+        freezing_pressure[i] = attrs["freezing_pressure"]
+        freezing_height[i] = attrs["freezing_height"]
+
+        lcl_pressure[i] = attrs["lcl_pressure"]
+        lcl_height[i] = attrs["lcl_height"]
+
+        lfc_pressure[i] = attrs["lfc_pressure"]
+        lfc_height[i] = attrs["lfc_height"]
+
+        lnb_pressure[i] = attrs["lnb_pressure"]
+        lnb_height[i] = attrs["lnb_height"]
+
+        cape[i] = attrs["cape"]
+        cin[i] = attrs["cin"]
+
+        lifted_index[i] = attrs["lifted_index"]
+        showalter_index[i] = attrs["showalter_index"]
+
+        k_index[i] = attrs["k_index"]
+        total_totals_index[i] = attrs["total_totals_index"]
+
+    ds = xr.Dataset(
+
+        data_vars={
+
+            **{
+                var: (("time", "level"), arrays[var])
+                for var in profile_vars
+            },
+
+            "pw": ("time", pw),
+
+            "inversion_pressure": ("time", inversion_pressure),
+            "inversion_height": ("time", inversion_height),
+
+            "mixed_layer_pressure": ("time", mixed_layer_pressure),
+            "mixed_layer_height": ("time", mixed_layer_height),
+
+            "freezing_pressure": ("time", freezing_pressure),
+            "freezing_height": ("time", freezing_height),
+
+            "lcl_pressure": ("time", lcl_pressure),
+            "lcl_height": ("time", lcl_height),
+
+            "lfc_pressure": ("time", lfc_pressure),
+            "lfc_height": ("time", lfc_height),
+
+            "lnb_pressure": ("time", lnb_pressure),
+            "lnb_height": ("time", lnb_height),
+
+            "cape": ("time", cape),
+            "cin": ("time", cin),
+
+            "lifted_index": ("time", lifted_index),
+            "showalter_index": ("time", showalter_index),
+
+            "k_index": ("time", k_index),
+            "total_totals_index": (
+                "time",
+                total_totals_index
+            ),
+        },
+
+        coords={
+            "time": pd.to_datetime(times),
+            "level": np.arange(max_levels),
+        },
+
+        attrs={
+            "source": "NOAA NCEI Integrated Global Radiosonde Archive (IGRA Version 2)",
+            "institution": "NOAA National Centers for Environmental Information",
+            "station": soundings[times[0]].attrs["station"],
+            "title": "IGRA Derived Radiosonde Profiles",
+            "history": (
+                f"Converted from IGRA text format on "
+                f"{pd.Timestamp.now().strftime('%Y-%m-%d %H:%M UTC')}"
+            ),
+            "references": (
+                "https://www.ncei.noaa.gov/products/weather-balloon/integrated-global-radiosonde-archive"
+                "integrated-global-radiosonde-archive"
+            ),
+            "featureType": "timeSeriesProfile"
+        }
+
+    )
+
+    return ds
 
 
-with zipfile.ZipFile(zip_file, mode="r") as zf:
-    text_files = [file for file in zf.namelist() if file.endswith(".txt")]
+def merge_sounding_datasets(
+        obs_ds: xr.Dataset,
+        derived_ds: xr.Dataset
+)\
+        -> xr.Dataset:
+    """Merges the observed profiles dataset and the derived profiles dataset into a single dataset."""
+    return xr.merge([obs_ds, derived_ds], compat="override")
 
-    if not text_files:
-        raise RuntimeError(f"No .txt files found in {ZIP_DIR.resolve().name}.")
 
-    with zf.open(text_files[0]) as f:
-        lines = f.read().decode("ascii").splitlines()
+def decode_igra_zipfile(zip_path: Path) -> list[str]:
+    """Return the decoded lines in the first text file in the IGRA2 zipfile."""
+    with zipfile.ZipFile(zip_path, mode='r') as zf:
 
-soundings = parse_soundings(lines)
+        text_files = [file for file in zf.namelist() if file.endswith(".txt")]
 
-ds = soundings_to_xarray(soundings)
-print(ds, "\n")
+        if not text_files:
+            raise(f"No .txt files found in {zip_path.resolve().name}.")
 
-output_file = filename.split("-")[0] + ".nc"
-ds.to_netcdf(ZIP_DIR / output_file)
+        with zf.open(text_files[0]) as f:
+            lines = f.read().decode("ascii").splitlines()
 
-print(f"Wrote {output_file} to the directory {ZIP_DIR.resolve()}.")
+        return lines
+
+
+# File names for the data file and the derived sounding files.
+data_file = "BBM00078954-data.txt.zip"
+drvd_file = "BBM00078954-drvd.txt.zip"
+
+# Locate the data and the derived sounding files.
+zip_data_file = DATA_DIR / data_file
+zip_drvd_file = DATA_DIR / drvd_file
+
+# Decode the data and the derived sounding files into a list of lines.
+data_lines = decode_igra_zipfile(zip_data_file)
+drvd_lines = decode_igra_zipfile(zip_drvd_file)
+
+# Parse the list of data lines into a dictionary of Timestamp and DataFrames.
+soundings = parse_soundings(data_lines)
+ds_data = soundings_to_xarray(soundings)
+
+# Parse the list of derived lines into a dictionary of Timestamp and DataFrames.
+derived_soundings = parse_derived_soundings(drvd_lines)
+ds_drvd = derived_soundings_to_xarray(derived_soundings)
+
+# Merge the data and derived datasets.
+ds = merge_sounding_datasets(ds_data, ds_drvd)
+
+# Write the output file to the data directory.
+output_file = data_file.split('-')[0] + '4.nc'
+ds.to_netcdf(DATA_DIR / output_file)
+
+print(f"Wrote {output_file} to the directory {DATA_DIR.resolve()}.")
+
+# ROOT = Path(__file__).resolve().parents[2]
+# DATA_DIR = Path("data")
+# ZIP_DIR = ROOT / DATA_DIR
+#
+# filename = "BBM00078954-data.txt.zip"
+# zip_file = ZIP_DIR / filename
+#
+#
+# with zipfile.ZipFile(zip_file, mode="r") as zf:
+#     text_files = [file for file in zf.namelist() if file.endswith(".txt")]
+#
+#     if not text_files:
+#         raise RuntimeError(f"No .txt files found in {ZIP_DIR.resolve().name}.")
+#
+#     with zf.open(text_files[0]) as f:
+#         lines = f.read().decode("ascii").splitlines()
+#
+# soundings = parse_soundings(lines)
+#
+# ds = soundings_to_xarray(soundings)
+# print(ds, "\n")
+#
+# output_file = filename.split("-")[0] + ".nc"
+# ds.to_netcdf(ZIP_DIR / output_file)
+#
+# print(f"Wrote {output_file} to the directory {ZIP_DIR.resolve()}.")

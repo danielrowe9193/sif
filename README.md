@@ -516,3 +516,253 @@ The Level‑2 STD‑PLVL dataset is ideal for:
 
 ---
 
+> ## IFS Forecast Dataset Structure (Level‑0)
+
+Level‑0 IFS forecast datasets represent the **raw, station‑based ECMWF forecast output**, preprocessed into a unified xarray structure.  
+This dataset contains:
+
+- Forecast fields for multiple surface and atmospheric variables  
+- Vertical wind profiles on standard pressure levels  
+- Soil‑layer variables (not important for SIF)
+- Metadata describing forecast initialization and lead time  
+- Four target weather stations used in the SIF campaign  
+
+Level‑0 is the **first harmonized forecast dataset** before any derived calculations or quality control.
+
+---
+
+## What Level‑0 Represents
+
+IFS Level‑0 is the **direct model output**, converted from GRIB to CF‑compliant NETCDF.  
+It contains:
+
+- All available forecast variables for each station  
+- Multiple forecast lead times (`valid_time`)  
+- Pressure‑level wind fields (`u`, `v`)  
+- Soil‑layer variables (not important for SIF)
+- Surface meteorological fields  
+- Full ECMWF metadata (centre, edition, conventions, history)
+
+This dataset is ideal for:
+
+- Model verification against radiosondes  
+- Time‑series analysis at fixed stations  
+- Vertical wind profile comparison  
+- Any workflow requiring raw forecast fields
+
+---
+
+## Dimensions
+
+### **`valid_time`**
+- Forecast timestamps  
+- Length: 120 forecast steps  
+- Represents the time at which the forecast is valid  
+- Paired with:
+  - `step` — forecast lead time (timedelta)  
+  - `forecast_hour` — categorical forecast hour label  
+  - `init_time` — model initialization time  
+
+### **`station`**
+- The four SIF campaign weather stations  
+- Example values: `"Norderney"`, `"Schleswig"`, `"Fehmarn"`, `"Griefswald"`  
+- Each station has associated metadata:
+  - `latitude`, `longitude`  
+  - `surface`  
+  - `heightAboveGround`  
+  - `entireAtmosphere`  
+  - `mostUnstableParcel`  
+  - `nominalTop`  
+  - `meanSea`
+
+### **`p`**
+- Pressure levels for wind fields  
+- Length: 14  
+- Standard ECMWF pressure levels (e.g., 1000, 925, 850, …, 30 hPa)
+
+---
+
+## Variables
+
+The dataset contains **43 forecast variables**, including:
+
+### **Atmospheric Variables**
+| Variable | Description | Units |
+|---------|-------------|-------|
+| `u` | Zonal wind at pressure levels | m/s |
+| `v` | Meridional wind at pressure levels | m/s |
+| `t` | Temperature | K |
+| `q` | Specific humidity | kg/kg |
+
+*(Variable names may differ depending on ECMWF parameter codes.)*
+
+---
+
+## Coordinates & Metadata
+
+### **Forecast Metadata**
+| Coordinate | Description |
+|-----------|-------------|
+| `valid_time` | Time the forecast is valid |
+| `step` | Forecast lead time (timedelta) |
+| `forecast_hour` | Label for forecast hour (e.g., `"12h"`, `"24h"`, `"48h"`) |
+| `init_time` | Model initialization time |
+
+### **Station Metadata**
+| Field | Description |
+|-------|-------------|
+| `latitude`, `longitude` | Station location |
+| `surface` | Surface height |
+| `heightAboveGround` | Sensor height |
+| `entireAtmosphere` | Full atmospheric column |
+| `mostUnstableParcel` | Parcel used for CAPE/CIN |
+| `nominalTop` | Model top |
+| `meanSea` | Sea‑level reference |
+
+---
+
+## Summary Table
+
+| Dataset | Dimensions | Vertical Resolution | Purpose |
+|--------|------------|---------------------|---------|
+| **IFS Level‑0** | valid_time × station × soilLayer × p | 14 pressure levels | Raw ECMWF forecast fields for verification & analysis |
+
+---
+
+> ## IFS Forecast Dataset Structure (Level‑1)
+
+Level‑1 IFS forecast datasets represent the **first derived‑variable layer** built on top of the raw ECMWF IFS Level‑0 forecast fields.  
+During Level‑1 processing:
+
+- Thermodynamic stability indices are computed for each station and forecast time:
+  - **CAPE** (Convective Available Potential Energy)  
+  - **CIN** (Convective Inhibition)  
+  - **TT‑index** (Total Totals Index)  
+  - **K‑index**  
+  - **LI** (Lifted Index)  
+- Geopotential height fields are calculated from pressure and temperature fields  
+- All original Level‑0 variables are preserved  
+- The dataset remains fully CF‑compliant and station‑based  
+
+Level‑1 is the **analysis‑ready forecast dataset**, suitable for convective diagnostics, model verification, and comparison with radiosonde‑derived Level‑2 datasets.
+
+---
+
+## What Level‑1 Represents
+
+IFS Level‑1 is the **enhanced forecast dataset**, containing:
+
+- All raw ECMWF forecast fields from Level‑0  
+- Derived thermodynamic indices for each station and forecast time
+- Geopotential height for each station and forecast time, and at each pressure level
+- Pressure‑level wind fields (`u`, `v`)  
+- Height fields on pressure levels  
+- Full ECMWF metadata (centre, edition, conventions, history)
+
+This dataset is ideal for:
+
+- Convective environment analysis  
+- Forecast skill evaluation  
+- Comparing model‑derived indices with radiosonde‑derived indices  
+- Time‑series analysis at fixed stations  
+- Synoptic and mesoscale meteorological studies  
+
+---
+
+## Dimensions
+
+### **`valid_time`**
+- Forecast timestamps  
+- Length: 120 forecast steps  
+- Represents the time at which the forecast is valid  
+- Paired with:
+  - `step` — forecast lead time (timedelta)  
+  - `forecast_hour` — categorical forecast hour label  
+  - `init_time` — model initialization time  
+
+### **`station`**
+- The four SIF campaign weather stations  
+- Example values: `"Norderney"`, `"Schleswig"`, `"Fehmarn"`, `"Griefswald"`  
+- Each station has associated metadata:
+  - `latitude`, `longitude`  
+  - `surface`  
+  - `heightAboveGround`  
+  - `entireAtmosphere`  
+  - `mostUnstableParcel`  
+  - `nominalTop`  
+  - `meanSea`
+
+### **`p`**
+- Pressure levels for wind and height fields  
+- Length: 14  
+- Standard ECMWF pressure levels (e.g., 1000, 925, 850, …, 30 hPa)
+
+---
+
+## Variables
+
+The Level‑1 dataset contains **50 forecast variables**, including all Level‑0 fields plus derived indices.
+
+
+### **Atmospheric Variables**
+| Variable | Description                            | Units   |
+|---------|----------------------------------------|---------|
+| `u` | Zonal wind at pressure levels          | m/s     |
+| `v` | Meridional wind at pressure levels     | m/s     |
+| `height` | Geopotential Height at pressure levels | m^2/s^2 |
+| `t` | Temperature                            | K       |
+| `q` | Specific humidity                      | kg/kg   |
+
+---
+
+## Derived Thermodynamic Indices (Level‑1 Additions)
+
+These variables are computed for each station and forecast time:
+
+| Variable | Description | Units |
+|---------|-------------|-------|
+| `cape` | Convective Available Potential Energy | J/kg |
+| `cin` | Convective Inhibition | J/kg |
+| `tt_index` | Total Totals Index | dimensionless |
+| `k_index` | K‑Index | °C |
+| `li` | Lifted Index | °C |
+
+These indices allow direct comparison with radiosonde Level‑2 stability indices.
+
+---
+
+## Coordinates & Metadata
+
+### **Forecast Metadata**
+| Coordinate | Description |
+|-----------|-------------|
+| `valid_time` | Time the forecast is valid |
+| `step` | Forecast lead time (timedelta) |
+| `forecast_hour` | Label for forecast hour (e.g., `"12h"`, `"24h"`, `"48h"`) |
+| `init_time` | Model initialization time |
+
+### **Station Metadata**
+| Field | Description |
+|-------|-------------|
+| `latitude`, `longitude` | Station location |
+| `surface` | Surface height |
+| `heightAboveGround` | Sensor height |
+| `entireAtmosphere` | Full atmospheric column |
+| `mostUnstableParcel` | Parcel used for CAPE/CIN |
+| `nominalTop` | Model top |
+| `meanSea` | Sea‑level reference |
+
+---
+
+## Summary Table
+
+| Dataset | Dimensions | Derived Variables | Purpose |
+|--------|------------|-------------------|---------|
+| **IFS Level‑1** | valid_time × station × soilLayer × p | CAPE, CIN, TT, K, LI | Convective diagnostics & model verification |
+
+---
+
+
+
+
+

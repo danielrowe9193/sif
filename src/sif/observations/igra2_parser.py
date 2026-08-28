@@ -8,6 +8,18 @@ import xarray as xr
 from src.sif.utils.utils import FileManagement
 
 
+# Areas for users to edit.
+igra_data_folder = FileManagement.IGRA_DIR.glob("*.txt.zip")
+
+# For soundings in a particular date range.
+start_date: str = "2006-08"
+end_date: str = "2026-09"
+
+# For soundings in only this year or these months.
+year: int = None
+month: int = 8
+
+
 def _parse_header(line: list) -> dict:
     """Parse one IGRA header line using the Header Record Format from
     https://www.ncei.noaa.gov/data/integrated-global-radiosonde-archive/doc/igra2-data-format.txt."""
@@ -133,14 +145,28 @@ def parse_soundings(
         lines: list[str],
         start_date: str | None = None,
         end_date: str | None = None,
+        year: int | None = None,
+        month: int | None = None
 )\
         -> dict[pd.Timestamp, pd.DataFrame]:
     """
-    Parse an IGRA station file into a dictionary of soundings.
+    Parse an IGRA2 station file into a dictionary of soundings.
 
     Parameters
         lines : list[str]
             List of lines from an IGRA station file.
+
+        start_date : str, optional
+            Earliest sounding to include in date range.
+
+        end_date : str, optional
+            Latest sounding to include in date range.
+
+        year : int, optional
+            Only include soundings from this year.
+
+        month : int, optional
+            Only include soundings from this month in the date range.
 
     Returns
         dict[pandas.Timestamp, pandas.DataFrame]
@@ -175,8 +201,21 @@ def parse_soundings(
         # Number of levels in this sounding.
         numlev = header["numlev"]
 
-        # Check whether the sounding is within the requested period.
-        if (start_date is not None and dt < start_date) or (end_date is not None and dt > end_date):
+        # Date-range filtering.
+        if start_date is not None and dt < start_date:
+            line_number += numlev + 1
+            continue
+
+        if end_date is not None and dt > end_date:
+            break
+
+        # Year filtering.
+        if year is not None and dt.year < year:
+            line_number += numlev + 1
+            continue
+
+        # Month filtering.
+        if month is not None and dt.month != month:
             line_number += numlev + 1
             continue
 
@@ -211,14 +250,28 @@ def parse_derived_soundings(
         lines: list[str],
         start_date: str | None = None,
         end_date: str | None = None,
+        year: int | None = None,
+        month: int | None = None
 ) \
         -> dict[pd.Timestamp, pd.DataFrame]:
     """
-    Parse an IGRA station file into a dictionary of soundings.
+    Parse an IGRA2 derived parameters station file into a dictionary of derived parameters.
 
     Parameters
         lines : list[str]
-            List of lines from an IGRA station file.
+            List of lines from an IGRA2 derived station file.
+
+        start_date : str, optional
+            Earliest sounding to include in date range.
+
+        end_date : str, optional
+            Latest sounding to include in date range.
+
+        year : int, optional
+            Only include soundings from this year.
+
+        month : int, optional
+            Only include soundings from this month in the date range.
 
     Returns
         dict[pandas.Timestamp, pandas.DataFrame]
@@ -254,8 +307,21 @@ def parse_derived_soundings(
         # Number of levels in this sounding.
         numlev = header["numlev"]
 
-        # Check whether the sounding is within the requested period.
-        if (start_date is not None and dt < start_date) or (end_date is not None and dt > end_date):
+        # Date-range filtering.
+        if start_date is not None and dt < start_date:
+            line_number += numlev + 1
+            continue
+
+        if end_date is not None and dt > end_date:
+            break
+
+        # Year filtering.
+        if year is not None and dt.year < year:
+            line_number += numlev + 1
+            continue
+
+        # Month filtering.
+        if month is not None and dt.month != month:
             line_number += numlev + 1
             continue
 
@@ -634,7 +700,7 @@ def drvd_zipfiles(file_list: list[str]) -> list[str]:
     return drvd_files
 
 
-zip_files = [zip_file.name for zip_file in FileManagement.IGRA_DIR.glob("*.txt.zip")]
+zip_files = [zip_file.name for zip_file in igra_data_folder]
 
 data_files = data_zipfiles(zip_files)
 drvd_files = drvd_zipfiles(zip_files)
@@ -657,7 +723,13 @@ for data_file in data_files:
 
     # Parse the data lines into a dictionary of Timestamps and DataFrames.
     print('Parsing sounding...')
-    soundings = parse_soundings(data_lines)
+    soundings = parse_soundings(
+        data_lines,
+        start_date=start_date,
+        end_date=end_date,
+        year=year,
+        month=month
+    )
 
     print('Writing the sounding dictionary into xarray...')
     ds_data = soundings_to_xarray(soundings)
@@ -677,7 +749,13 @@ for data_file in data_files:
         drvd_lines = decode_igra_zipfile(zip_drvd_file)
 
         print('Parsing derived file...')
-        derived_soundings = parse_derived_soundings(drvd_lines)
+        derived_soundings = parse_derived_soundings(
+            drvd_lines,
+            start_date=start_date,
+            end_date=end_date,
+            year=year,
+            month=month
+        )
 
         print('Writing the derived dictionary into xarray...')
         ds_drvd = derived_soundings_to_xarray(derived_soundings)
@@ -699,7 +777,7 @@ for data_file in data_files:
     )
 
     # Write the output file.
-    output_file = FileManagement.NETCDF_DIR / f"{station_id}.nc"
+    output_file = FileManagement.NETCDF_DIR / f"Aug-2006-2026-{station_id}.nc"
 
     print("Generating NetCDF file...\n")
     ds_data.to_netcdf(output_file)

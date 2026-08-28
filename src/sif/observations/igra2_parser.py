@@ -561,8 +561,8 @@ def merge_sounding_datasets(
         derived_ds: xr.Dataset
 )\
         -> xr.Dataset:
-    """Merges the observed profiles dataset and the derived profiles dataset into a single dataset."""
-    return xr.merge([obs_ds, derived_ds], compat="override")
+    """Merges the observed profiles dataset and the derived indices dataset into a single dataset."""
+    return xr.merge([obs_ds, derived_ds], compat="override", join='outer')
 
 
 def decode_igra_zipfile(zip_path: Path) -> list[str]:

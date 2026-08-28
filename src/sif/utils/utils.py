@@ -65,46 +65,44 @@ class CalcUtils:
         return profile
 
     @staticmethod
-    def calculate_td_from_rh(profile: xr.Dataset | xr.DataTree):
+    def calculate_td_from_rh(radiosonde_dataset: xr.Dataset | xr.DataTree) -> xr.Dataset:
+        """
+        Calculates dewpoint temperatures for every radiosonde in the dataset.
 
-        ta = profile['ta']
-        print(ta, ta.shape)
-        ta = ta.transpose()
-        print(ta, ta.shape)
-        rh = profile['rh']
-        print(rh, rh.shape)
+        Requires that the vertical coordinate is labelled 'p'.
+        :param radiosonde_dataset: The dataset containing air temperature and relative humidity values with the required shape.
+        :return: Updated dataset containing dewpoint temperatures as a variable 'td'
+        """
 
-        def td(ta, rh):
-            ta = ta * units.kelvin
-            rh = rh * units.percent
+        radiosonde_dataset = radiosonde_dataset.copy()
 
-            td = (mpcalc.dewpoint_from_relative_humidity(ta, rh)).to(units.kelvin)
+        air_temp = radiosonde_dataset['ta'].data * units.kelvin
+        rel_humi = radiosonde_dataset['rh'].data * units.percent
 
-            return td.magnitude
+        dew_temp = mpcalc.dewpoint_from_relative_humidity(
+            air_temp, rel_humi
+        ).to(units.kelvin)
 
-        t_d = xr.apply_ufunc(
-            td,
-            ta,
-            rh,
-            input_core_dims=[["p"], ["p"]],
-            output_core_dims=[['p']],
-            vectorize=True,
-            dask="parallelized",
-            output_dtypes=[float],
+        radiosonde_dataset["td"] = xr.DataArray(
+            dew_temp.magnitude,
+            dims=radiosonde_dataset["ta"].dims,
+            coords=radiosonde_dataset["ta"].coords,
+            attrs={
+                "long_name": "Dewpoint temperature",
+                "units": "K",
+            },
         )
 
-        profile['td'] = t_d
-
-        return profile
+        return radiosonde_dataset
 
     @staticmethod
-    def calculate_cape(profile: xr.Dataset | xr.DataTree):
+    def calculate_cape(radiosonde_dataset: xr.Dataset | xr.DataTree):
         """
         Calculate CAPE and CIN from a collection of soundings.
 
         Parameters
         ----------
-        profile : xr.Dataset | xr.DataTree
+        radiosonde_dataset : xr.Dataset | xr.DataTree
             Dataset containing p, ta and td with dimensions
             (sounding_id, p).
 
@@ -115,13 +113,15 @@ class CalcUtils:
             with dimension (sounding_id,).
         """
 
+        radiosonde_dataset = radiosonde_dataset.copy()
+
         cape_list = []
         cin_list = []
 
-        for sounding_num in profile.sounding_num.values:
+        for sounding_num in radiosonde_dataset.sounding_num.values:
 
             try:
-                radiosonde = profile.sel(sounding_num=sounding_num)
+                radiosonde = radiosonde_dataset.sel(sounding_num=sounding_num)
 
                 p = radiosonde["p"].values * units.hPa
                 t = radiosonde["ta"].values * units.kelvin
@@ -159,102 +159,99 @@ class CalcUtils:
         cape = xr.DataArray(
             cape_list,
             dims=["sounding_num"],
-            coords={"sounding_num": profile.sounding_num}
+            coords={"sounding_num": radiosonde_dataset.sounding_num + 1},
+            attrs={
+                "long_name": "Convective Available Potential Energy",
+                "units": "J/Kg",
+            },
         )
 
         cin = xr.DataArray(
             cin_list,
             dims=["sounding_num"],
-            coords={"sounding_num": profile.sounding_num}
+            coords={"sounding_num": radiosonde_dataset.sounding_num},
+            attrs={
+                "long_name": "Convective Inhibition",
+                "units": "J/Kg",
+            },
         )
 
-        profile["cape"] = cape
-        profile["cin"] = cin
+        radiosonde_dataset["cape"] = cape
+        radiosonde_dataset["cin"] = cin
 
-        return profile
+        return radiosonde_dataset
 
     @staticmethod
-    def calculate_k_index(profile: xr.Dataset | xr.DataTree):
+    def calculate_k_index(radiosonde_dataset: xr.Dataset | xr.DataTree):
 
-        p, t, td = xr.broadcast(
-            profile["p"],
-            profile["ta"],
-            profile["td"]
+        radiosonde_dataset = radiosonde_dataset.copy()
+
+        p = np.broadcast_to(
+            radiosonde_dataset['p'].data,
+            radiosonde_dataset['ta'].shape
+        ) * units.hPa
+        t = radiosonde_dataset["ta"].data * units.kelvin
+        td = radiosonde_dataset["td"].data * units.kelvin
+
+        k = mpcalc.k_index(p.T, t.T, td.T).magnitude
+
+        radiosonde_dataset["k_index"] = xr.DataArray(
+            k,
+            dims=("sounding_num",),
+            coords={
+                "sounding_num": radiosonde_dataset["sounding_num"]
+            },
+            attrs={
+                "long_name": "K-Index",
+                "units": "Celsius",
+            },
         )
 
-        def k_index(p, t, td):
-            p = p * units.hPa
-            t = t * units.kelvin
-            td = td * units.kelvin
-
-            return mpcalc.k_index(p, t, td).magnitude
-
-        k = xr.apply_ufunc(
-            k_index,
-            p,
-            t,
-            td,
-            input_core_dims=[["p"], ["p"], ["p"]],
-            output_core_dims=[[]],
-            vectorize=True,
-            dask="parallelized",
-            output_dtypes=[float],
-        )
-
-        profile["k_index"] = k
-
-        return profile
+        return radiosonde_dataset
 
     @staticmethod
-    def calculate_tt_index(profile: xr.Dataset | xr.DataTree):
-        p, t, td = xr.broadcast(
-            profile["p"],
-            profile["ta"],
-            profile["td"]
+    def calculate_tt_index(radiosonde_dataset: xr.Dataset | xr.DataTree):
+
+        radiosonde_dataset = radiosonde_dataset.copy()
+
+        p = np.broadcast_to(
+            radiosonde_dataset['p'].data,
+            radiosonde_dataset['ta'].shape
+        ) * units.hPa
+        ta = radiosonde_dataset["ta"].data * units.kelvin
+        td = radiosonde_dataset["td"].data * units.kelvin
+
+        tt = mpcalc.total_totals_index(p.T, ta.T, td.T).magnitude
+
+        radiosonde_dataset["tt_index"] = xr.DataArray(
+            tt,
+            dims=("sounding_num",),
+            coords={
+                "sounding_num": radiosonde_dataset["sounding_num"]
+            },
+            attrs={
+                "long_name": "Totals Totals Index",
+                "units": "Celsius",
+            },
         )
 
-        def tt_index(p, t, td):
-            p = p * units.hPa
-            t = t * units.kelvin
-            td = td * units.kelvin
-
-            return mpcalc.total_totals_index(p, t, td).magnitude
-
-        tt = xr.apply_ufunc(
-            tt_index,
-            p,
-            t,
-            td,
-            input_core_dims=[["p"], ["p"], ["p"]],
-            output_core_dims=[[]],
-            vectorize=True,
-            dask="parallelized",
-            output_dtypes=[float],
-        )
-
-        profile["tt_index"] = tt
-
-        return profile
+        return radiosonde_dataset
 
     @staticmethod
-    def calculate_li(profile: xr.Dataset | xr.DataTree):
+    def calculate_li(radiosonde_dataset: xr.Dataset | xr.DataTree):
 
-        def calculate_single_li(p, t, td, h):
+        def calculate_single_li(p, ta, td, h):
 
             try:
                 # Attach units
                 p = p * units.hPa
-                t = t * units.kelvin
+                ta = ta * units.kelvin
                 td = td * units.kelvin
                 h = h * units.m
 
-                # Convert temperatures
-                t = t.to("degC")
-                td = td.to("degC")
-
                 # 500-m mixed parcel
                 parcel_p, parcel_t, parcel_td = mpcalc.mixed_parcel(
-                    p, t, td, depth=500 * units.m, height=h
+                    p, ta, td, depth=500 * units.m, height=h
                 )
 
                 # Replace lowest 500 m with mixed parcel
@@ -262,7 +259,7 @@ class CalcUtils:
 
                 press = np.concatenate([[parcel_p], p[above]])
 
-                temp = np.concatenate([[parcel_t], t[above]])
+                temp = np.concatenate([[parcel_t], ta[above]])
 
                 # Parcel profile
                 mixed_prof = mpcalc.parcel_profile(press, parcel_t, parcel_td)
@@ -277,10 +274,10 @@ class CalcUtils:
 
         li = xr.apply_ufunc(
             calculate_single_li,
-            profile["p"],
-            profile["ta"],
-            profile["td"],
-            profile["height"],
+            radiosonde_dataset["p"],
+            radiosonde_dataset["ta"],
+            radiosonde_dataset["td"],
+            radiosonde_dataset["height"],
             input_core_dims=[
                 ["p"],
                 ["p"],
@@ -292,15 +289,19 @@ class CalcUtils:
             output_dtypes=[float],
         )
 
-        profile["li"] = li
+        radiosonde_dataset["li"] = xr.DataArray(
+            li,
+            dims=("sounding_num",),
+            coords={
+                "sounding_num": radiosonde_dataset["sounding_num"]
+            },
+            attrs={
+                "long_name": "Lifted Index",
+                "units": "Celsius",
+            },
+        )
 
-        return profile
-
-
-class PlotUtils:
-    """Utilities for plotting measurements taken during the experiment."""
-
-    ...
+        return radiosonde_dataset
 
 
 class FileManagement:

@@ -5,6 +5,8 @@ import numpy as np
 import pandas as pd
 import xarray as xr
 
+from src.sif.utils.utils import FileManagement
+
 
 def _parse_header(line: list) -> dict:
     """Parse one IGRA header line using the Header Record Format from
@@ -127,7 +129,12 @@ def _parse_derived_level(line: str) -> dict:
 
 
 # Parse the entire file.
-def parse_soundings(lines: list[str]) -> dict[pd.Timestamp, pd.DataFrame]:
+def parse_soundings(
+        lines: list[str],
+        start_date: str | None = None,
+        end_date: str | None = None,
+)\
+        -> dict[pd.Timestamp, pd.DataFrame]:
     """
     Parse an IGRA station file into a dictionary of soundings.
 
@@ -141,6 +148,8 @@ def parse_soundings(lines: list[str]) -> dict[pd.Timestamp, pd.DataFrame]:
             DataFrames containing the sounding profile. The header metadata
             are stored in each DataFrame's ``attrs`` dictionary.
     """
+    start_date = pd.Timestamp(start_date)
+    end_date = pd.Timestamp(end_date)
 
     soundings = {}
 
@@ -155,9 +164,25 @@ def parse_soundings(lines: list[str]) -> dict[pd.Timestamp, pd.DataFrame]:
 
         header = _parse_header(lines[line_number])
 
+        # Datetime for this sounding.
+        dt = pd.Timestamp(
+            year=header["year"],
+            month=header["month"],
+            day=header["day"],
+            hour=header["hour"],
+        )
+
+        # Number of levels in this sounding.
+        numlev = header["numlev"]
+
+        # Check whether the sounding is within the requested period.
+        if (start_date is not None and dt < start_date) or (end_date is not None and dt > end_date):
+            line_number += numlev + 1
+            continue
+
         profile = []
 
-        for sounding_level in range(header["numlev"]):
+        for sounding_level in range(numlev):
             profile.append(_parse_level(lines[line_number + sounding_level + 1]))
 
         df = pd.DataFrame(profile)
@@ -171,14 +196,6 @@ def parse_soundings(lines: list[str]) -> dict[pd.Timestamp, pd.DataFrame]:
         df["dewpoint"] = df["temperature"] - df["dpdp"]
         df["wind_speed"] /= 10.0  # tenths m/s -> m/s
 
-        # Datetime for this sounding.
-        dt = pd.Timestamp(
-            year=header["year"],
-            month=header["month"],
-            day=header["day"],
-            hour=header["hour"],
-        )
-
         # Store metadata in DataFrame attributes
         df.attrs = header
 
@@ -190,7 +207,12 @@ def parse_soundings(lines: list[str]) -> dict[pd.Timestamp, pd.DataFrame]:
     return soundings
 
 
-def parse_derived_soundings(lines: list[str]) -> dict[pd.Timestamp, pd.DataFrame]:
+def parse_derived_soundings(
+        lines: list[str],
+        start_date: str | None = None,
+        end_date: str | None = None,
+) \
+        -> dict[pd.Timestamp, pd.DataFrame]:
     """
     Parse an IGRA station file into a dictionary of soundings.
 
@@ -204,6 +226,8 @@ def parse_derived_soundings(lines: list[str]) -> dict[pd.Timestamp, pd.DataFrame
             DataFrames containing the sounding profile. The header metadata
             are stored in each DataFrame's ``attrs`` dictionary.
     """
+    start_date = pd.Timestamp(start_date)
+    end_date = pd.Timestamp(end_date)
 
     soundings = {}
 
@@ -219,9 +243,25 @@ def parse_derived_soundings(lines: list[str]) -> dict[pd.Timestamp, pd.DataFrame
 
         header = _parse_derived_header(lines[line_number])
 
+        # Datetime for this sounding.
+        dt = pd.Timestamp(
+            year=header["year"],
+            month=header["month"],
+            day=header["day"],
+            hour=header["hour"],
+        )
+
+        # Number of levels in this sounding.
+        numlev = header["numlev"]
+
+        # Check whether the sounding is within the requested period.
+        if (start_date is not None and dt < start_date) or (end_date is not None and dt > end_date):
+            line_number += numlev + 1
+            continue
+
         profile = []
 
-        for sounding_level in range(header["numlev"]):
+        for sounding_level in range(numlev):
 
             profile.append(_parse_derived_level(lines[line_number + sounding_level + 1]))
 
@@ -580,34 +620,125 @@ def decode_igra_zipfile(zip_path: Path) -> list[str]:
         return lines
 
 
-# File names for the data file and the derived sounding files.
-data_file = "BBM00078954-data.txt.zip"
-drvd_file = "BBM00078954-drvd.txt.zip"
+def data_zipfiles(file_list: list[str]) -> list[str]:
+    """Extract the IGRA2 data files from a mixed list."""
+    data_files = [file for file in file_list if file.endswith("-data.txt.zip")]
 
-# Locate the data and the derived sounding files.
-zip_data_file = DATA_DIR / data_file
-zip_drvd_file = DATA_DIR / drvd_file
+    return data_files
 
-# Decode the data and the derived sounding files into a list of lines.
-data_lines = decode_igra_zipfile(zip_data_file)
-drvd_lines = decode_igra_zipfile(zip_drvd_file)
 
-# Parse the list of data lines into a dictionary of Timestamp and DataFrames.
-soundings = parse_soundings(data_lines)
-ds_data = soundings_to_xarray(soundings)
+def drvd_zipfiles(file_list: list[str]) -> list[str]:
+    """Extract the IGRA2 derived files from a mixed list."""
+    drvd_files = [file for file in file_list if file.endswith("-drvd.txt.zip")]
 
-# Parse the list of derived lines into a dictionary of Timestamp and DataFrames.
-derived_soundings = parse_derived_soundings(drvd_lines)
-ds_drvd = derived_soundings_to_xarray(derived_soundings)
+    return drvd_files
 
-# Merge the data and derived datasets.
-ds = merge_sounding_datasets(ds_data, ds_drvd)
 
-# Write the output file to the data directory.
-output_file = data_file.split('-')[0] + '4.nc'
-ds.to_netcdf(DATA_DIR / output_file)
+zip_files = [zip_file.name for zip_file in FileManagement.IGRA_DIR.glob("*.txt.zip")]
 
-print(f"Wrote {output_file} to the directory {DATA_DIR.resolve()}.")
+data_files = data_zipfiles(zip_files)
+drvd_files = drvd_zipfiles(zip_files)
+
+
+for data_file in data_files:
+
+    # Get the station id.
+    station_id = data_file.split('-')[0]
+
+    # Locate the data file.
+    zip_data_file = FileManagement.IGRA_DIR / data_file
+
+    print(f"Processing {station_id}...")
+
+
+    # Decode the data file.
+    print(f'Decoding {data_file}...')
+    data_lines = decode_igra_zipfile(zip_data_file)
+
+    # Parse the data lines into a dictionary of Timestamps and DataFrames.
+    print('Parsing sounding...')
+    soundings = parse_soundings(data_lines)
+
+    print('Writing the sounding dictionary into xarray...')
+    ds_data = soundings_to_xarray(soundings)
+    print("Successfully wrote to xarray.\n")
+
+
+    # Find the corresponding derived file.
+    drvd_file = f"{station_id}-drvd.txt.zip"
+    zip_drvd_file = FileManagement.IGRA_DIR / drvd_file
+
+    # If the derived file exists, decode, parse, and merge it.
+    if zip_drvd_file.exists():
+
+        print(f"Found derived file for {station_id}.")
+
+        print(f'Decoding {drvd_file}...')
+        drvd_lines = decode_igra_zipfile(zip_drvd_file)
+
+        print('Parsing derived file...')
+        derived_soundings = parse_derived_soundings(drvd_lines)
+
+        print('Writing the derived dictionary into xarray...')
+        ds_drvd = derived_soundings_to_xarray(derived_soundings)
+        print("Successfully wrote to xarray.\n")
+
+        # Merge the data and derived datasets.
+        print("Merging sounding data and derived datasets...")
+        ds_data = merge_sounding_datasets(ds_data, ds_drvd)
+        print("Datasets successfully merged.\n")
+
+    else:
+        print(f"No derived file found for {station_id}.")
+        print("Creating dataset from sounding data only.\n")
+
+    # Create the NetCDF directory.
+    FileManagement.NETCDF_DIR.mkdir(
+        exist_ok=True,
+        parents=True,
+    )
+
+    # Write the output file.
+    output_file = FileManagement.NETCDF_DIR / f"{station_id}.nc"
+
+    print("Generating NetCDF file...\n")
+    ds_data.to_netcdf(output_file)
+
+    print(
+        f"Successfully wrote {output_file.name} "
+        f"to {FileManagement.NETCDF_DIR.resolve()}.\n"
+    )
+
+
+
+# # File names for the data file and the derived sounding files.
+# data_file = "BBM00078954-data.txt.zip"
+# drvd_file = "BBM00078954-drvd.txt.zip"
+#
+# # Locate the data and the derived sounding files.
+# zip_data_file = FileManagement.IGRA_DIR
+# zip_drvd_file = DATA_DIR / drvd_file
+#
+# # Decode the data and the derived sounding files into a list of lines.
+# data_lines = decode_igra_zipfile(zip_data_file)
+# drvd_lines = decode_igra_zipfile(zip_drvd_file)
+#
+# # Parse the list of data lines into a dictionary of Timestamps and DataFrames.
+# soundings = parse_soundings(data_lines)
+# ds_data = soundings_to_xarray(soundings)
+#
+# # Parse the list of derived lines into a dictionary of Timestamp and DataFrames.
+# derived_soundings = parse_derived_soundings(drvd_lines)
+# ds_drvd = derived_soundings_to_xarray(derived_soundings)
+#
+# # Merge the data and derived datasets.
+# ds = merge_sounding_datasets(ds_data, ds_drvd)
+#
+# # Write the output file to the data directory.
+# output_file = data_file.split('-')[0] + '4.nc'
+# ds.to_netcdf(DATA_DIR / output_file)
+#
+# print(f"Wrote {output_file} to the directory {DATA_DIR.resolve()}.")
 
 # ROOT = Path(__file__).resolve().parents[2]
 # DATA_DIR = Path("data")

@@ -86,9 +86,12 @@ def get_parameter_keys(data):
     wanted_variables = [
         "t", # temperature  
         "r", # relative humidity
+        "q", # specific humidity
         "gh", # geopotential height
         "u", # zonal wind
-        "v", #meridional wind
+        "v", # meridional wind
+        # "cape",  # different level type (Pressure from ground layer)
+        # "cin",
     ]
 
     return [

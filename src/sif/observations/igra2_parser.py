@@ -5,6 +5,7 @@ import numpy as np
 import pandas as pd
 import xarray as xr
 
+from src.sif.observations.igra2_requests import igra2_stations_df
 from src.sif.utils.utils import FileManagement
 
 
@@ -448,6 +449,11 @@ def soundings_to_xarray(soundings: dict[pd.Timestamp, pd.DataFrame]) -> xr.Datas
         p_src.append(attrs["p_src"])
         np_src.append(attrs["np_src"])
 
+    # Get attributes from the station list.
+    df = igra2_stations_df()
+    attrs_dict = df.loc[df["station_id"]==soundings[times[0]].attrs["station"]].reset_index(drop=True).iloc[0].to_dict()
+
+
     ds = xr.Dataset(
         data_vars={
             "pressure": (
@@ -647,7 +653,6 @@ def soundings_to_xarray(soundings: dict[pd.Timestamp, pd.DataFrame]) -> xr.Datas
         attrs={
             "source": "NOAA NCEI Integrated Global Radiosonde Archive (IGRA Version 2)",
             "institution": "NOAA National Centers for Environmental Information",
-            "station": soundings[times[0]].attrs["station"],
             "title": "IGRA Radiosonde Profiles",
             "history": (
                 f"Converted from IGRA text format on "
@@ -660,6 +665,10 @@ def soundings_to_xarray(soundings: dict[pd.Timestamp, pd.DataFrame]) -> xr.Datas
             "featureType": "timeSeriesProfile",
         },
     )
+
+    ds.attrs.update(attrs_dict)
+    ds.attrs['station_name'] = ds.attrs['station_name'].title()
+    ds.attrs['elevation_units'] = 'm'
 
     return ds
 
@@ -786,6 +795,11 @@ def derived_soundings_to_xarray(soundings: dict[pd.Timestamp, pd.DataFrame]) -> 
 
         k_index[i] = attrs["k_index"]
         total_totals_index[i] = attrs["total_totals_index"]
+
+    # Get attributes from the station list.
+    df = igra2_stations_df()
+    attrs_dict = df.loc[df["station_id"] == soundings[times[0]].attrs["station"]].reset_index(drop=True).iloc[0].to_dict()
+
 
     ds = xr.Dataset(
 
@@ -1299,7 +1313,6 @@ def derived_soundings_to_xarray(soundings: dict[pd.Timestamp, pd.DataFrame]) -> 
         attrs={
             "source": "NOAA NCEI Integrated Global Radiosonde Archive (IGRA Version 2)",
             "institution": "NOAA National Centers for Environmental Information",
-            "station": soundings[times[0]].attrs["station"],
             "title": "IGRA Derived Radiosonde Profiles",
             "history": (
                 f"Converted from IGRA text format on "
@@ -1313,6 +1326,10 @@ def derived_soundings_to_xarray(soundings: dict[pd.Timestamp, pd.DataFrame]) -> 
         }
 
     )
+
+    ds.attrs.update(attrs_dict)
+    ds.attrs['station_name'] = ds.attrs['station_name'].title()
+    ds.attrs['elevation_units'] = 'm'
 
     return ds
 

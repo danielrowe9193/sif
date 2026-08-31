@@ -637,8 +637,23 @@ def derived_soundings_to_xarray(soundings: dict[pd.Timestamp, pd.DataFrame]) -> 
         },
 
         coords={
-            "time": pd.to_datetime(times),
-            "level": np.arange(max_levels),
+            "time": (
+                "time",
+                pd.to_datetime(times),
+                {
+                    "long_name": "sounding time",
+                    "standard_name": "time",
+                    "description": "Date and time of the radiosonde sounding.",
+                },
+            ),
+            "level": (
+                "level",
+                np.arange(max_levels),
+                {
+                    "long_name": "sounding level",
+                    "description": "Index of the vertical sounding levels.",
+                },
+            ),
         },
 
         attrs={

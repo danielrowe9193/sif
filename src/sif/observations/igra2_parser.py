@@ -235,6 +235,11 @@ def parse_soundings(
         df["dewpoint"] = df["temperature"] - df["dpdp"]
         df["wind_speed"] /= 10.0  # tenths m/s -> m/s
 
+        # header["release_time"] = pd.to_datetime(
+        #     dt.strftime("%Y-%m-%d") + str(header["release_time"]).zfill(4),
+        #     format="%Y-%m-%d%H%M",
+        # )
+
         # Store metadata in DataFrame attributes
         df.attrs = header
 
@@ -359,6 +364,8 @@ def parse_derived_soundings(
         df["v_wind"] /= 10.0
         df["v_wind_gradient"] /= 10                     # m/s/km
 
+        # df["pw"] /= 100                                 # mm
+
         dt = pd.Timestamp(
             year=header["year"],
             month=header["month"],
@@ -443,13 +450,195 @@ def soundings_to_xarray(soundings: dict[pd.Timestamp, pd.DataFrame]) -> xr.Datas
 
     ds = xr.Dataset(
         data_vars={
-            **{var: (("time", "level"), arrays[var]) for var in profile_vars},
-            "release_time": ("time", release_time),
-            "numlev": ("time", numlev),
-            "latitude": ("time", lat),
-            "longitude": ("time", lon),
-            "pressure_source": ("time", np.asarray(p_src, dtype="U16")),
-            "nonpressure_source": ("time", np.asarray(np_src, dtype="U16")),
+            "pressure": (
+                ("time", "level"),
+                arrays["pressure"],
+                {
+                    "long_name": "air pressure",
+                    "standard_name": "air_pressure",
+                    "units": "Pa",
+                    "description": "Air pressure at the sounding level.",
+                },
+            ),
+
+            "height": (
+                ("time", "level"),
+                arrays["height"],
+                {
+                    "long_name": "geopotential height",
+                    "standard_name": "geopotential_height",
+                    "units": "m",
+                    "description": "Geopotential height of the sounding level.",
+                },
+            ),
+
+            "temperature": (
+                ("time", "level"),
+                arrays["temperature"],
+                {
+                    "long_name": "air temperature",
+                    "standard_name": "air_temperature",
+                    "units": "K",
+                    "description": "Air temperature at the sounding level.",
+                },
+            ),
+
+            "dewpoint": (
+                ("time", "level"),
+                arrays["dewpoint"],
+                {
+                    "long_name": "dew-point temperature",
+                    "standard_name": "dew_point_temperature",
+                    "units": "K",
+                    "description": "Dew-point temperature at the sounding level.",
+                },
+            ),
+
+            "dew_point_depression": (
+                ("time", "level"),
+                arrays["dew_point_depression"],
+                {
+                    "long_name": "dew-point depression",
+                    "units": "K",
+                    "description": "Difference between air temperature and dew-point temperature."                    ,
+                },
+            ),
+
+            "wind_dir": (
+                ("time", "level"),
+                arrays["wind_dir"],
+                {
+                    "long_name": "wind direction",
+                    "standard_name": "wind_from_direction",
+                    "units": "degrees",
+                    "description": (
+                        "Direction from which the wind is blowing, "
+                        "measured clockwise from true north."
+                    ),
+                },
+            ),
+
+            "wind_speed": (
+                ("time", "level"),
+                arrays["wind_speed"],
+                {
+                    "long_name": "wind speed",
+                    "standard_name": "wind_speed",
+                    "units": "m/s",
+                    "description": "Horizontal wind speed at the sounding level.",
+                },
+            ),
+
+            "relative_humidity": (
+                ("time", "level"),
+                arrays["relative_humidity"],
+                {
+                    "long_name": "relative humidity",
+                    "standard_name": "relative_humidity",
+                    "units": "%",
+                    "description": "Relative humidity at the sounding level.",
+                },
+            ),
+
+            "lvltyp1": (
+                ("time", "level"),
+                arrays["lvltyp1"],
+                {
+                    "long_name": "primary level type",
+                    "description": (
+                        "IGRA level-type code identifying the primary "
+                        "characteristic of the sounding level."
+                    ),
+                },
+            ),
+
+            "lvltyp2": (
+                ("time", "level"),
+                arrays["lvltyp2"],
+                {
+                    "long_name": "secondary level type",
+                    "description": (
+                        "IGRA level-type code identifying the secondary "
+                        "characteristic of the sounding level."
+                    ),
+                },
+            ),
+
+            "etime": (
+                ("time", "level"),
+                arrays["etime"],
+                {
+                    "long_name": "elapsed time since launch",
+                    "units": "s",
+                    "description": (
+                        "Elapsed time from radiosonde launch to the "
+                        "observation at the sounding level."
+                    ),
+                },
+            ),
+
+            # Per-sounding variables
+
+            "release_time": (
+                "time",
+                release_time,
+                {
+                    "long_name": "release time",
+                    "units": "minutes",
+                    "description": (
+                        "Time of radiosonde release relative to "
+                        "the nominal sounding time."
+                    ),
+                },
+            ),
+
+            "numlev": (
+                "time",
+                numlev,
+                {
+                    "long_name": "number of levels",
+                    "units": "1",
+                    "description": "Number of reported levels in the sounding."
+                },
+            ),
+
+            "latitude": (
+                "time",
+                lat,
+                {
+                    "long_name": "station latitude",
+                    "standard_name": "latitude",
+                    "units": "degrees_north",
+                },
+            ),
+
+            "longitude": (
+                "time",
+                lon,
+                {
+                    "long_name": "station longitude",
+                    "standard_name": "longitude",
+                    "units": "degrees_east",
+                },
+            ),
+
+            "pressure_source": (
+                "time",
+                np.asarray(p_src, dtype="U16"),
+                {
+                    "long_name": "pressure source",
+                    "description": "IGRA source code for pressure observations.",
+                },
+            ),
+
+            "nonpressure_source": (
+                "time",
+                np.asarray(np_src, dtype="U16"),
+                {
+                    "long_name": "non-pressure source",
+                    "description": "IGRA source code for non-pressure observations."
+                },
+            ),
         },
         coords={
             "time": pd.to_datetime(times),
@@ -477,13 +666,17 @@ def soundings_to_xarray(soundings: dict[pd.Timestamp, pd.DataFrame]) -> xr.Datas
 
 def derived_soundings_to_xarray(soundings: dict[pd.Timestamp, pd.DataFrame]) -> xr.Dataset:
     """
-    Convert a dictionary of IGRA derived quantities into an xarray Dataset.
+    Convert a dictionary of IGRA derived sounding quantities into an xarray Dataset.
 
     Parameters
-        soundings : dict[pd.Timestamp, pd.DataFrame]. This is generated using parse_soundings.
+    ----------
+    soundings : dict[pd.Timestamp, pd.DataFrame]
+        Dictionary generated using ``parse_derived_soundings``.
 
     Returns
-        xr.Dataset for each derived sounding sorted by timestamp.
+    ----------
+    xr.Dataset
+        IGRA derived sounding parameters sorted chronologically.
     """
 
     # Sort chronologically
@@ -598,41 +791,488 @@ def derived_soundings_to_xarray(soundings: dict[pd.Timestamp, pd.DataFrame]) -> 
 
         data_vars={
 
-            **{
-                var: (("time", "level"), arrays[var])
-                for var in profile_vars
-            },
+            # Profile variables
 
-            "pw": ("time", pw),
+            "pressure": (
+                ("time", "level"),
+                arrays["pressure"],
+                {
+                    "long_name": "air pressure",
+                    "standard_name": "air_pressure",
+                    "units": "hPa",
+                    "description": "Reported pressure at the sounding level.",
+                },
+            ),
 
-            "inversion_pressure": ("time", inversion_pressure),
-            "inversion_height": ("time", inversion_height),
+            "reported_geopotential_height": (
+                ("time", "level"),
+                arrays["reported_geopotential_height"],
+                {
+                    "long_name": "reported geopotential height",
+                    "standard_name": "geopotential_height",
+                    "units": "m",
+                    "description": "Reported geopotential height at the sounding level.",
+                },
+            ),
 
-            "mixed_layer_pressure": ("time", mixed_layer_pressure),
-            "mixed_layer_height": ("time", mixed_layer_height),
+            "calculated_geopotential_height": (
+                ("time", "level"),
+                arrays["calculated_geopotential_height"],
+                {
+                    "long_name": "calculated geopotential height",
+                    "standard_name": "geopotential_height",
+                    "units": "m",
+                    "description": (
+                        "Geopotential height calculated using hydrostatic "
+                        "balance where reported geopotential height is "
+                        "unavailable."
+                    ),
+                },
+            ),
 
-            "freezing_pressure": ("time", freezing_pressure),
-            "freezing_height": ("time", freezing_height),
+            "temperature": (
+                ("time", "level"),
+                arrays["temperature"],
+                {
+                    "long_name": "air temperature",
+                    "standard_name": "air_temperature",
+                    "units": "K",
+                    "description": (
+                        "Reported air temperature at the sounding level."
+                    ),
+                },
+            ),
 
-            "lcl_pressure": ("time", lcl_pressure),
-            "lcl_height": ("time", lcl_height),
+            "temperature_gradient": (
+                ("time", "level"),
+                arrays["temperature_gradient"],
+                {
+                    "long_name": "vertical temperature gradient",
+                    "units": "K km-1",
+                    "description": (
+                        "Temperature gradient between the current level "
+                        "and the next higher level with a temperature "
+                        "observation. Positive values indicate increasing "
+                        "temperature with height."
+                    ),
+                },
+            ),
 
-            "lfc_pressure": ("time", lfc_pressure),
-            "lfc_height": ("time", lfc_height),
+            "potential_temperature": (
+                ("time", "level"),
+                arrays["potential_temperature"],
+                {
+                    "long_name": "potential temperature",
+                    "standard_name": "air_potential_temperature",
+                    "units": "K",
+                    "description": "Potential temperature at the sounding level.",
+                },
+            ),
 
-            "lnb_pressure": ("time", lnb_pressure),
-            "lnb_height": ("time", lnb_height),
+            "potential_temperature_gradient": (
+                ("time", "level"),
+                arrays["potential_temperature_gradient"],
+                {
+                    "long_name": "vertical potential temperature gradient",
+                    "units": "K km-1",
+                    "description": (
+                        "Potential temperature gradient between the current "
+                        "level and the next higher level with a potential "
+                        "temperature observation. Positive values indicate "
+                        "increasing potential temperature with height."
+                    ),
+                },
+            ),
 
-            "cape": ("time", cape),
-            "cin": ("time", cin),
+            "virtual_temperature": (
+                ("time", "level"),
+                arrays["virtual_temperature"],
+                {
+                    "long_name": "virtual temperature",
+                    "standard_name": "virtual_temperature",
+                    "units": "K",
+                    "description": "Virtual temperature at the sounding level.",
+                },
+            ),
 
-            "lifted_index": ("time", lifted_index),
-            "showalter_index": ("time", showalter_index),
+            "virtual_potential_temperature": (
+                ("time", "level"),
+                arrays["virtual_potential_temperature"],
+                {
+                    "long_name": "virtual potential temperature",
+                    "standard_name": "virtual_potential_temperature",
+                    "units": "K",
+                    "description": "Virtual potential temperature at the sounding level.",
+                },
+            ),
 
-            "k_index": ("time", k_index),
+            "vapor_pressure": (
+                ("time", "level"),
+                arrays["vapor_pressure"],
+                {
+                    "long_name": "water vapor pressure",
+                    "standard_name": "water_vapor_partial_pressure_in_air",
+                    "units": "hPa",
+                    "description": (
+                        "Vapor pressure calculated from temperature, "
+                        "pressure, and dew-point depression."
+                    ),
+                },
+            ),
+
+            "saturation_vapor_pressure": (
+                ("time", "level"),
+                arrays["saturation_vapor_pressure"],
+                {
+                    "long_name": "saturation vapor pressure",
+                    "standard_name": "water_vapor_saturation_pressure",
+                    "units": "hPa",
+                    "description": "Saturation vapor pressure calculated from pressure and temperature.",
+                },
+            ),
+
+            "reported_relative_humidity": (
+                ("time", "level"),
+                arrays["reported_relative_humidity"],
+                {
+                    "long_name": "reported relative humidity",
+                    "standard_name": "relative_humidity",
+                    "units": "%",
+                    "description": "Relative humidity reported in the original sounding.",
+                },
+            ),
+
+            "calculated_relative_humidity": (
+                ("time", "level"),
+                arrays["calculated_relative_humidity"],
+                {
+                    "long_name": "calculated relative humidity",
+                    "standard_name": "relative_humidity",
+                    "units": "%",
+                    "description": (
+                        "Relative humidity calculated from vapor pressure, "
+                        "saturation vapor pressure, and pressure."
+                    ),
+                },
+            ),
+
+            "relative_humidity_gradient": (
+                ("time", "level"),
+                arrays["relative_humidity_gradient"],
+                {
+                    "long_name": "vertical relative humidity gradient",
+                    "units": "% km-1",
+                    "description": (
+                        "Relative humidity gradient between the current "
+                        "level and the next higher usable level. Positive "
+                        "values indicate increasing relative humidity "
+                        "with height."
+                    ),
+                },
+            ),
+
+            "u_wind": (
+                ("time", "level"),
+                arrays["u_wind"],
+                {
+                    "long_name": "zonal wind component",
+                    "standard_name": "eastward_wind",
+                    "units": "m s-1",
+                    "description": (
+                        "Zonal wind component calculated from reported "
+                        "wind speed and direction. Positive values are "
+                        "eastward."
+                    ),
+                },
+            ),
+
+            "u_wind_gradient": (
+                ("time", "level"),
+                arrays["u_wind_gradient"],
+                {
+                    "long_name": "vertical zonal wind gradient",
+                    "units": "m s-1 km-1",
+                    "description": (
+                        "Vertical gradient of the zonal wind component "
+                        "between the current level and the next higher "
+                        "level with a wind observation. Positive values "
+                        "indicate that zonal wind becomes more positive "
+                        "with height."
+                    ),
+                },
+            ),
+
+            "v_wind": (
+                ("time", "level"),
+                arrays["v_wind"],
+                {
+                    "long_name": "meridional wind component",
+                    "standard_name": "northward_wind",
+                    "units": "m s-1",
+                    "description": (
+                        "Meridional wind component calculated from reported "
+                        "wind speed and direction. Positive values are "
+                        "northward."
+                    ),
+                },
+            ),
+
+            "v_wind_gradient": (
+                ("time", "level"),
+                arrays["v_wind_gradient"],
+                {
+                    "long_name": "vertical meridional wind gradient",
+                    "units": "m s-1 km-1",
+                    "description": (
+                        "Vertical gradient of the meridional wind component "
+                        "between the current level and the next higher "
+                        "level with a wind observation. Positive values "
+                        "indicate that meridional wind becomes more positive "
+                        "with height."
+                    ),
+                },
+            ),
+
+            "refractive_index": (
+                ("time", "level"),
+                arrays["refractive_index"],
+                {
+                    "long_name": "radio refractive index",
+                    "units": "1",
+                    "description": (
+                        "Atmospheric refractive index at the sounding level."
+                    ),
+                },
+            ),
+
+            # Sounding-level parameters
+
+            "pw": (
+                "time",
+                pw,
+                {
+                    "long_name": "precipitable water",
+                    "standard_name": "atmosphere_water_vapor_content",
+                    "units": "mm",
+                    "description": "Precipitable water between the surface and 500 hPa.",
+                },
+            ),
+
+            "inversion_pressure": (
+                "time",
+                inversion_pressure,
+                {
+                    "long_name": "inversion pressure",
+                    "units": "Pa",
+                    "description": (
+                        "Pressure at the level of the warmest temperature "
+                        "in the sounding when the warmest temperature "
+                        "occurs above the surface."
+                    ),
+                },
+            ),
+
+            "inversion_height": (
+                "time",
+                inversion_height,
+                {
+                    "long_name": "inversion height",
+                    "units": "m",
+                    "description": "Height above the surface of the warmest temperature in the sounding.",
+                },
+            ),
+
+            "mixed_layer_pressure": (
+                "time",
+                mixed_layer_pressure,
+                {
+                    "long_name": "mixed-layer top pressure",
+                    "units": "Pa",
+                    "description": "Pressure at the top of the mixed layer determined using the parcel method.",
+                },
+            ),
+
+            "mixed_layer_height": (
+                "time",
+                mixed_layer_height,
+                {
+                    "long_name": "mixed-layer top height",
+                    "units": "m",
+                    "description": (
+                        "Height above the surface of the top of the "
+                        "mixed layer determined using the parcel method."
+                    ),
+                },
+            ),
+
+            "freezing_pressure": (
+                "time",
+                freezing_pressure,
+                {
+                    "long_name": "freezing-level pressure",
+                    "units": "Pa",
+                    "description": (
+                        "Pressure where temperature first reaches the "
+                        "freezing point when moving upward from the surface."
+                    ),
+                },
+            ),
+
+            "freezing_height": (
+                "time",
+                freezing_height,
+                {
+                    "long_name": "freezing-level height",
+                    "units": "m",
+                    "description": (
+                        "Height above the surface where temperature first "
+                        "reaches the freezing point."
+                    ),
+                },
+            ),
+
+            "lcl_pressure": (
+                "time",
+                lcl_pressure,
+                {
+                    "long_name": "lifting condensation level pressure",
+                    "standard_name": "air_pressure_at_lifting_condensation_level",
+                    "units": "Pa",
+                    "description": "Pressure at the lifting condensation level.",
+                },
+            ),
+
+            "lcl_height": (
+                "time",
+                lcl_height,
+                {
+                    "long_name": "lifting condensation level height",
+                    "units": "m",
+                    "description": "Height above the surface of the lifting condensation level.",
+                },
+            ),
+
+            "lfc_pressure": (
+                "time",
+                lfc_pressure,
+                {
+                    "long_name": "level of free convection pressure",
+                    "units": "Pa",
+                    "description": "Pressure at the level of free convection.",
+                },
+            ),
+
+            "lfc_height": (
+                "time",
+                lfc_height,
+                {
+                    "long_name": "level of free convection height",
+                    "units": "m",
+                    "description": "Height above the surface of the level of free convection.",
+                },
+            ),
+
+            "lnb_pressure": (
+                "time",
+                lnb_pressure,
+                {
+                    "long_name": "level of neutral buoyancy pressure",
+                    "units": "Pa",
+                    "description": (
+                        "Pressure at the level of neutral buoyancy, "
+                        "also known as the equilibrium level."
+                    ),
+                },
+            ),
+
+            "lnb_height": (
+                "time",
+                lnb_height,
+                {
+                    "long_name": "level of neutral buoyancy height",
+                    "units": "m",
+                    "description": (
+                        "Height above the surface of the level of "
+                        "neutral buoyancy."
+                    ),
+                },
+            ),
+
+            # Stability indices
+
+            "lifted_index": (
+                "time",
+                lifted_index,
+                {
+                    "long_name": "lifted index",
+                    "units": "degC",
+                    "description": "Lifted index calculated from the sounding.",
+                },
+            ),
+
+            "showalter_index": (
+                "time",
+                showalter_index,
+                {
+                    "long_name": "Showalter index",
+                    "units": "degC",
+                    "description": (
+                        "Showalter stability index calculated from "
+                        "the sounding."
+                    ),
+                },
+            ),
+
+            "k_index": (
+                "time",
+                k_index,
+                {
+                    "long_name": "K index",
+                    "units": "degC",
+                    "description": (
+                        "K index calculated from the sounding."
+                    ),
+                },
+            ),
+
             "total_totals_index": (
                 "time",
-                total_totals_index
+                total_totals_index,
+                {
+                    "long_name": "total totals index",
+                    "units": "degC",
+                    "description": (
+                        "Total totals stability index calculated from "
+                        "the sounding."
+                    ),
+                },
+            ),
+
+            "cape": (
+                "time",
+                cape,
+                {
+                    "long_name": "convective available potential energy",
+                    "standard_name": "atmosphere_specific_convective_available_potential_energy",
+                    "units": "J kg-1",
+                    "description": (
+                        "Convective available potential energy calculated "
+                        "from the sounding."
+                    ),
+                },
+            ),
+
+            "cin": (
+                "time",
+                cin,
+                {
+                    "long_name": "convective inhibition",
+                    "standard_name": "atmosphere_specific_convective_inhibition",
+                    "units": "J kg-1",
+                    "description": (
+                        "Convective inhibition calculated from the sounding."
+                    ),
+                },
             ),
         },
 
@@ -715,94 +1355,95 @@ def drvd_zipfiles(file_list: list[str]) -> list[str]:
     return drvd_files
 
 
-zip_files = [zip_file.name for zip_file in igra_data_folder]
+def main():
+    zip_files = [zip_file.name for zip_file in igra_data_folder]
 
-data_files = data_zipfiles(zip_files)
-drvd_files = drvd_zipfiles(zip_files)
+    # Extract the IGRA2 files.
+    data_files = data_zipfiles(zip_files)
+    drvd_files = drvd_zipfiles(zip_files)
 
+    for data_file in data_files:
 
-for data_file in data_files:
+        # Get the station id.
+        station_id = data_file.split('-')[0]
 
-    # Get the station id.
-    station_id = data_file.split('-')[0]
+        # Locate the data file.
+        zip_data_file = FileManagement.IGRA_DIR / data_file
 
-    # Locate the data file.
-    zip_data_file = FileManagement.IGRA_DIR / data_file
+        print(f"Processing {station_id}...")
 
-    print(f"Processing {station_id}...")
+        # Decode the data file.
+        print(f'Decoding {data_file}...')
+        data_lines = decode_igra_zipfile(zip_data_file)
 
-
-    # Decode the data file.
-    print(f'Decoding {data_file}...')
-    data_lines = decode_igra_zipfile(zip_data_file)
-
-    # Parse the data lines into a dictionary of Timestamps and DataFrames.
-    print('Parsing sounding...')
-    soundings = parse_soundings(
-        data_lines,
-        start_date=start_date,
-        end_date=end_date,
-        year=year,
-        month=month
-    )
-
-    print('Writing the sounding dictionary into xarray...')
-    ds_data = soundings_to_xarray(soundings)
-    print("Successfully wrote to xarray.\n")
-
-
-    # Find the corresponding derived file.
-    drvd_file = f"{station_id}-drvd.txt.zip"
-    zip_drvd_file = FileManagement.IGRA_DIR / drvd_file
-
-    # If the derived file exists, decode, parse, and merge it.
-    if zip_drvd_file.exists():
-
-        print(f"Found derived file for {station_id}.")
-
-        print(f'Decoding {drvd_file}...')
-        drvd_lines = decode_igra_zipfile(zip_drvd_file)
-
-        print('Parsing derived file...')
-        derived_soundings = parse_derived_soundings(
-            drvd_lines,
+        # Parse the data lines into a dictionary of Timestamps and DataFrames.
+        print('Parsing sounding...')
+        soundings = parse_soundings(
+            data_lines,
             start_date=start_date,
             end_date=end_date,
             year=year,
             month=month
         )
 
-        print('Writing the derived dictionary into xarray...')
-        ds_drvd = derived_soundings_to_xarray(derived_soundings)
+        print('Writing the sounding dictionary into xarray...')
+        ds_data = soundings_to_xarray(soundings)
         print("Successfully wrote to xarray.\n")
 
-        # Merge the data and derived datasets.
-        print("Merging sounding data and derived datasets...")
-        ds_data = merge_sounding_datasets(ds_data, ds_drvd)
-        print("Datasets successfully merged.\n")
+        # Find the corresponding derived file.
+        drvd_file = f"{station_id}-drvd.txt.zip"
+        zip_drvd_file = FileManagement.IGRA_DIR / drvd_file
 
-    else:
-        print(f"No derived file found for {station_id}.")
-        print("Creating dataset from sounding data only.\n")
+        # If the derived file exists, decode, parse, and merge it.
+        if zip_drvd_file.exists():
 
-    # Create the NetCDF directory.
-    FileManagement.NETCDF_DIR.mkdir(
-        exist_ok=True,
-        parents=True,
-    )
+            print(f"Found derived file for {station_id}.")
 
-    # Write the output file.
-    output_file = FileManagement.NETCDF_DIR / f"Aug-2006-2026-{station_id}.nc"
+            print(f'Decoding {drvd_file}...')
+            drvd_lines = decode_igra_zipfile(zip_drvd_file)
 
-    print("Generating NetCDF file...\n")
-    ds_data.to_netcdf(output_file)
+            print('Parsing derived file...')
+            derived_soundings = parse_derived_soundings(
+                drvd_lines,
+                start_date=start_date,
+                end_date=end_date,
+                year=year,
+                month=month
+            )
 
-    print(
-        f"Successfully wrote {output_file.name} "
-        f"to {FileManagement.NETCDF_DIR.resolve()}.\n"
-    )
+            print('Writing the derived dictionary into xarray...')
+            ds_drvd = derived_soundings_to_xarray(derived_soundings)
+            print("Successfully wrote to xarray.\n")
+
+            # Merge the data and derived datasets.
+            print("Merging sounding data and derived datasets...")
+            ds_data = merge_sounding_datasets(ds_data, ds_drvd)
+            print("Datasets successfully merged.\n")
+
+        else:
+            print(f"No derived file found for {station_id}.")
+            print("Creating dataset from sounding data only.\n")
+
+        # Create the NetCDF directory.
+        FileManagement.NETCDF_DIR.mkdir(
+            exist_ok=True,
+            parents=True,
+        )
+
+        # Write the output file.
+        output_file = FileManagement.NETCDF_DIR / f"Aug-2006-2026-{station_id}.nc"
+
+        print("Generating NetCDF file...\n")
+        ds_data.to_netcdf(output_file)
+
+        print(
+            f"Successfully wrote {output_file.name} "
+            f"to {FileManagement.NETCDF_DIR.resolve()}.\n"
+        )
 
 
+if __name__ == "__main__":
+    main()
 
 # # File names for the data file and the derived sounding files.
 # data_file = "BBM00078954-data.txt.zip"

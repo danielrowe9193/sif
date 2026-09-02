@@ -175,3 +175,11 @@ class IFSLevelOne:
         """
         self.dataset.to_netcdf(self.dataset_filepath)
         return None
+
+
+class GFSLevelZero:
+    ...
+    
+
+class GFSLevelOne:
+    ...

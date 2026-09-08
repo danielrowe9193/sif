@@ -70,7 +70,7 @@ date_no_dash = date_input.replace("-","") # remove dash from date
 cycles = ["00","06","12","18"]
 
 BASE_PATH = Path(__file__).resolve().parent.parent.parent / "data" / "ICON"
-output_path = BASE_PATH / "netcdf"
+output_path = BASE_PATH / date_input 
 output_path.mkdir(parents=True, exist_ok=True)
 
 cell_file = BASE_PATH / "lat_lon.txt"

@@ -121,8 +121,19 @@ def get_station_ids(
     return list(df[mask]["station_id"])
 
 
-def download_soundings(station_ids: list[str], derived: bool = True) -> None:
-    """This function downloads the sounding data for a given list of station ids."""
+def download_soundings(station_ids: list[str], derived: Optional[bool] = True) -> None:
+    """This function downloads the sounding data for a given list of station ids.
+
+    Parameters:
+        station_ids: list[str]
+            List of IGRA2 station IDs to be downloaded. This can be used nicely with get_station_ids.
+
+        derived: Optional[bool]
+            Downloads the derived sounding profiles along with the sounding data. Defaults to True.
+
+    Returns:
+        None
+        """
 
     base_url = "https://www.ncei.noaa.gov/data/integrated-global-radiosonde-archive/access/"
 
@@ -153,7 +164,7 @@ def download_soundings(station_ids: list[str], derived: bool = True) -> None:
                 with open(output_file, "wb") as zf:
                     zf.write(response.content)
 
-                print("Successfully downloaded!\n")
+                print(f"Successfully downloaded to {output_file.resolve()}.\n")
 
             else:
                 print(f"Could not download {zip_file}; response code: {response.status_code}.")

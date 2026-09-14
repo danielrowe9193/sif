@@ -1,13 +1,11 @@
 import numpy as np
 import pandas as pd
-import src.sif.utils.calculations as scalc
-import src.sif.utils.file_management as sfile
+import src.sif.utils.calculations as calc
+import src.sif.utils.file_management as fm
 import xarray as xr
 import xml.etree.ElementTree as ET
 import zipfile
 
-from metpy.calc import dewpoint_from_relative_humidity
-from metpy.units import units
 from pathlib import Path
 
 
@@ -35,7 +33,7 @@ class Radiosonde:
         extracted .xml files.
         """
         self.filepath = Path(filepath)
-        self.extraction_dir = sfile.XML_DIR / self.filepath.stem
+        self.extraction_dir = fm.XML_DIR / self.filepath.stem
         self.extraction_dir.mkdir(exist_ok="True")
 
     def extract_mwx(self) -> None:
@@ -395,13 +393,17 @@ class RadiosondesLevel2:
         """
 
         # Perform calculations
-        self.ptu_radiosonde_ds = scalc.calculate_potential_temperature(self.radiosondes_lvl1.ptu_radiosonde_ds)
-        self.ptu_radiosonde_ds = scalc.calculate_td_from_rh(self.radiosondes_lvl1.ptu_radiosonde_ds)
+        self.ptu_radiosonde_ds = calc.calculate_potential_temperature(self.radiosondes_lvl1.ptu_radiosonde_ds)
+        self.ptu_radiosonde_ds = calc.calculate_td_from_rh(self.radiosondes_lvl1.ptu_radiosonde_ds)
+        self.ptu_radiosonde_ds = calc.calculate_wet_bulb_potential_temperature(self.ptu_radiosonde_ds)
 
-        self.ptu_radiosonde_ds = scalc.calculate_cape(self.ptu_radiosonde_ds)
-        self.ptu_radiosonde_ds = scalc.calculate_tt_index(self.ptu_radiosonde_ds)
-        self.ptu_radiosonde_ds = scalc.calculate_k_index(self.ptu_radiosonde_ds)
-        self.ptu_radiosonde_ds = scalc.calculate_li(self.ptu_radiosonde_ds)
+        self.ptu_radiosonde_ds = calc.calculate_cape(self.ptu_radiosonde_ds)
+        self.ptu_radiosonde_ds = calc.calculate_tt_index(self.ptu_radiosonde_ds)
+        self.ptu_radiosonde_ds = calc.calculate_k_index(self.ptu_radiosonde_ds)
+        self.ptu_radiosonde_ds = calc.calculate_li(self.ptu_radiosonde_ds)
+        self.ptu_radiosonde_ds = calc.calculate_si(self.ptu_radiosonde_ds)
+        self.ptu_radiosonde_ds = calc.calculate_ri(self.ptu_radiosonde_ds)
+        self.ptu_radiosonde_ds = calc.calculate_ji(self.ptu_radiosonde_ds)
 
         return self.ptu_radiosonde_ds
 
@@ -414,13 +416,17 @@ class RadiosondesLevel2:
         """
 
         # Perform calculations
-        self.std_plvl_radiosonde_ds = scalc.calculate_potential_temperature(self.radiosondes_lvl1.std_plvl_radiosonde_ds)
-        self.std_plvl_radiosonde_ds = scalc.calculate_td_from_rh(self.radiosondes_lvl1.std_plvl_radiosonde_ds)
+        self.std_plvl_radiosonde_ds = calc.calculate_potential_temperature(self.radiosondes_lvl1.std_plvl_radiosonde_ds)
+        self.std_plvl_radiosonde_ds = calc.calculate_td_from_rh(self.radiosondes_lvl1.std_plvl_radiosonde_ds)
+        self.std_plvl_radiosonde_ds = calc.calculate_wet_bulb_potential_temperature(self.std_plvl_radiosonde_ds)
 
-        self.std_plvl_radiosonde_ds = scalc.calculate_cape(self.std_plvl_radiosonde_ds)
-        self.std_plvl_radiosonde_ds = scalc.calculate_tt_index(self.std_plvl_radiosonde_ds)
-        self.std_plvl_radiosonde_ds = scalc.calculate_k_index(self.std_plvl_radiosonde_ds)
-        self.std_plvl_radiosonde_ds = scalc.calculate_li(self.std_plvl_radiosonde_ds)
+        self.std_plvl_radiosonde_ds = calc.calculate_cape(self.std_plvl_radiosonde_ds)
+        self.std_plvl_radiosonde_ds = calc.calculate_tt_index(self.std_plvl_radiosonde_ds)
+        self.std_plvl_radiosonde_ds = calc.calculate_k_index(self.std_plvl_radiosonde_ds)
+        self.std_plvl_radiosonde_ds = calc.calculate_li(self.std_plvl_radiosonde_ds)
+        self.std_plvl_radiosonde_ds = calc.calculate_si(self.std_plvl_radiosonde_ds)
+        self.std_plvl_radiosonde_ds = calc.calculate_ri(self.std_plvl_radiosonde_ds)
+        self.std_plvl_radiosonde_ds = calc.calculate_ji(self.std_plvl_radiosonde_ds)
 
         return self.std_plvl_radiosonde_ds
 
@@ -451,7 +457,7 @@ class RadiosondePipeline:
         )
         lvl0.build_ptu_radiosondes_lvl0()
         lvl0.ptu_radiosonde_ds.to_netcdf(
-            sfile.NETCDF_DIR / "sif.ptu_radiosondes.profiles.level0.nc"
+            fm.NETCDF_DIR / "sif.ptu_radiosondes.profiles.level0.nc"
         )
 
         lvl1 = RadiosondesLevel1(
@@ -459,7 +465,7 @@ class RadiosondePipeline:
         )
         lvl1.build_ptu_radiosondes_lvl1()
         lvl1.ptu_radiosonde_ds.to_netcdf(
-            sfile.NETCDF_DIR / "sif.ptu_radiosondes.profiles.level1.nc"
+            fm.NETCDF_DIR / "sif.ptu_radiosondes.profiles.level1.nc"
         )
 
         lvl2 = RadiosondesLevel2(
@@ -467,7 +473,7 @@ class RadiosondePipeline:
         )
         lvl2.build_ptu_radiosondes_lvl2()
         lvl2.ptu_radiosonde_ds.to_netcdf(
-            sfile.NETCDF_DIR / "sif.ptu_radiosondes.profiles.level2.nc"
+            fm.NETCDF_DIR / "sif.ptu_radiosondes.profiles.level2.nc"
         )
 
         return None
@@ -480,7 +486,7 @@ class RadiosondePipeline:
         )
         lvl0.build_std_plvl_radiosondes_lvl0()
         lvl0.std_plvl_radiosonde_ds.to_netcdf(
-            sfile.NETCDF_DIR / "sif.std_plvl_radiosondes.profiles.level0.nc"
+            fm.NETCDF_DIR / "sif.std_plvl_radiosondes.profiles.level0.nc"
         )
 
         lvl1 = RadiosondesLevel1(
@@ -488,7 +494,7 @@ class RadiosondePipeline:
         )
         lvl1.build_std_plvl_radiosondes_lvl1()
         lvl1.std_plvl_radiosonde_ds.to_netcdf(
-            sfile.NETCDF_DIR / "sif.std_plvl_radiosondes.profiles.level1.nc"
+            fm.NETCDF_DIR / "sif.std_plvl_radiosondes.profiles.level1.nc"
         )
 
         lvl2 = RadiosondesLevel2(
@@ -496,7 +502,7 @@ class RadiosondePipeline:
         )
         lvl2.build_std_plvl_radiosondes_lvl2()
         lvl2.std_plvl_radiosonde_ds.to_netcdf(
-            sfile.NETCDF_DIR / "sif.std_plvl_radiosondes.profiles.level2.nc"
+            fm.NETCDF_DIR / "sif.std_plvl_radiosondes.profiles.level2.nc"
         )
 
         return None

@@ -20,7 +20,7 @@ def calculate_potential_temperature(radiosonde_dataset: xr.Dataset | xr.DataTree
     def calc_theta(pressure, temperature):
         """Compute the potential temperature."""
         pressure = pressure * units.hPa
-        temperature = temperature * units.units.kelvin
+        temperature = temperature * units.kelvin
 
         _theta = mpcalc.potential_temperature(
             pressure=pressure,

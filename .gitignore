@@ -1,5 +1,5 @@
 # Ignore data folder.
-/sif/data
+/data
 
 # Ignore data file types anywhere.
 *.nc

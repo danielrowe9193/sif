@@ -5,6 +5,52 @@ import xarray as xr
 from metpy.units import units
 
 
+def calculate_potential_temperature(radiosonde_dataset: xr.Dataset | xr.DataTree):
+    """
+    Calculates the potential temperature from a concatenated radiosonde dataset.
+
+    :param radiosonde_dataset: The radiosonde dataset. Expects to contain pressure and temperature
+    stored as 'p' and 'ta'.
+    :return: A dataset updated with potential temperature labelled as theta.
+    """
+
+    p = radiosonde_dataset['p']
+    ta = radiosonde_dataset['ta']
+
+    def calc_theta(pressure, temperature):
+        """Compute the potential temperature."""
+        pressure = pressure * units.hPa
+        temperature = temperature * units.units.kelvin
+
+        _theta = mpcalc.potential_temperature(
+            pressure=pressure,
+            temperature=temperature
+        )
+
+        return _theta.magnitude
+
+    theta = xr.apply_ufunc(
+        calc_theta,
+        p,
+        ta,
+        input_core_dims=[["p"], ["p"]],
+        output_core_dims=[["p"]],
+        vectorize=True,
+        dask="parallelized",
+        output_dtypes=[float],
+    )
+
+    radiosonde_dataset['theta'] = xr.DataArray(
+        theta,
+        dims=radiosonde_dataset["ta"].dims,
+        coords=radiosonde_dataset["ta"].coords,
+        attrs={
+            "long_name": "potential temperature",
+            "units": "K",
+        },
+    )
+
+
 def calculate_height_from_geopotential(profile: xr.Dataset | xr.DataTree):
 
     geopot = profile["z"]

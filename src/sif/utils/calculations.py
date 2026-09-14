@@ -511,3 +511,43 @@ def calculate_ji(radiosonde_dataset: xr.Dataset | xr.DataTree):
     )
 
     return radiosonde_dataset
+
+def calculate_sweat(radiosonde_dataset: xr.Dataset | xr.DataTree):
+    """
+    Calculate Severe Weather Threat Index (SWEAT) using MetPy function based on:
+
+    SWEAT = 12 [Td(850 mb)] + 20 (TT - 49) + 2 (f8) + f5 + 125 (S + 0.2)
+
+    :param radiosonde_dataset: A dataset containing radiosonde profiles.
+    :return: A dataset updated with the RI for each radiosonde.
+
+    """
+
+    radiosonde_dataset = radiosonde_dataset.copy()
+
+    p = (
+        np.broadcast_to(radiosonde_dataset["p"].data, radiosonde_dataset["ta"].shape)
+        * units.hPa
+    )
+    # check units
+    ta = radiosonde_dataset["ta"].data * units.degC #units.kelvin?
+    td = radiosonde_dataset["td"].data * units.degC
+    wspeed = radiosonde_dataset["wspeed"].data * units("m/s")
+    wdir = radiosonde_dataset["wdir"].data * units.degrees
+
+    sweat = mpcalc.sweat_index(p.T, ta.T, td.T, wspeed.T, wdir.T).magnitude
+
+    radiosonde_dataset["sweat_index"] = xr.DataArray(
+        sweat,
+        dims=("sounding_num",),
+        coords={"sounding_num": radiosonde_dataset["sounding_num"]},
+        attrs={
+            "long_name": "SWEAT Index",
+            "units": "none",
+        },
+    )
+
+    return radiosonde_dataset
+
+
+

@@ -1,9 +1,9 @@
 import numpy as np
+import src.sif.utils.calculations as calc
+import src.sif.utils.file_management as fm
 import xarray as xr
 
 from src.sif.utils.config import Constants
-from pathlib import Path
-from src.sif.utils.utils import CalcUtils, FileManagement
 
 xr.set_options(use_new_combine_kwarg_defaults=True)
 
@@ -24,14 +24,14 @@ class IFSLevelZero:
         """
         Initialize an IFSLevelZero instance.
         """
-        self.data_dir = FileManagement.IFS_DIR
+        self.data_dir = fm.IFS_DIR
 
         self._ifs_path_list = []
         self._ifs_ds_list = []
 
         self.dataset: None | xr.Dataset = None
         self.dataset_filepath = (
-            FileManagement.IFS_DIR / "ifs.radiosondes.profiles.level0.nc"
+            fm.IFS_DIR / "ifs.radiosondes.profiles.level0.nc"
         )
 
     def collect_fc_file_paths(self) -> None:
@@ -134,7 +134,7 @@ class IFSLevelOne:
 
         self.dataset = xr.open_dataset(self.ifs_level_zero.dataset_filepath)
         self.dataset_filepath = (
-            FileManagement.IFS_DIR / "ifs.radiosondes.profiles.level1.nc"
+            fm.IFS_DIR / "ifs.radiosondes.profiles.level1.nc"
         )
 
     def build_ifs_level_one_ds(self) -> None:
@@ -156,12 +156,12 @@ class IFSLevelOne:
         -------
         None
         """
-        self.dataset = CalcUtils.calculate_td_from_q(self.dataset)
-        self.dataset = CalcUtils.calculate_height_from_geopotential(self.dataset)
-        self.dataset = CalcUtils.calculate_cape(self.dataset)
-        self.dataset = CalcUtils.calculate_k_index(self.dataset)
-        self.dataset = CalcUtils.calculate_tt_index(self.dataset)
-        self.dataset = CalcUtils.calculate_li(self.dataset)
+        self.dataset = calc.calculate_td_from_q(self.dataset)
+        self.dataset = calc.calculate_height_from_geopotential(self.dataset)
+        self.dataset = calc.calculate_cape(self.dataset)
+        self.dataset = calc.calculate_k_index(self.dataset)
+        self.dataset = calc.calculate_tt_index(self.dataset)
+        self.dataset = calc.calculate_li(self.dataset)
 
         return None
 

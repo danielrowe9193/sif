@@ -45,10 +45,69 @@ def calculate_potential_temperature(radiosonde_dataset: xr.Dataset | xr.DataTree
         dims=radiosonde_dataset["ta"].dims,
         coords=radiosonde_dataset["ta"].coords,
         attrs={
-            "long_name": "potential temperature",
+            "long_name": "Potential Temperature",
             "units": "K",
         },
     )
+
+    return radiosonde_dataset
+
+
+def calculate_wet_bulb_potential_temperature(radiosonde_dataset: xr.Dataset | xr.DataTree):
+    """
+    Calculates the wet bulb potential temperature for each radiosonde in a given
+    dataset.
+
+    :param radiosonde_dataset: The radiosonde dataset. Expects to contain pressure and temperature
+    stored as 'p' and 'ta'.
+    :return: A dataset updated with wet bulb potential temperature labelled as theta_w.
+    """
+
+    p = radiosonde_dataset['p']
+    ta = radiosonde_dataset['ta']
+    td = radiosonde_dataset['td']
+
+    def calc_wet_bulb_potential_temperature(pressure, temperature, dewpoint):
+        """Calculate and return wet bulb potential temperature."""
+        press = pressure * units.hPa
+        temp = temperature * units.kelvin
+        dew = dewpoint * units.kelvin
+
+        _theta_w = mpcalc.wet_bulb_potential_temperature(
+            pressure=press,
+            temperature=temp,
+            dewpoint=dew
+        )
+
+        return _theta_w.magnitude
+
+    theta_w = xr.apply_ufunc(
+        calc_wet_bulb_potential_temperature,
+        p,
+        ta,
+        td,
+        input_core_dims=[
+            ["p"],
+            ["p"],
+            ["p"]
+        ],
+        output_core_dims=[["p"]],
+        vectorize=True,
+        dask="parallelized",
+        output_dtypes=[float],
+    )
+
+    radiosonde_dataset['theta_w'] = xr.DataArray(
+        theta_w,
+        dims=radiosonde_dataset["ta"].dims,
+        coords=radiosonde_dataset["ta"].coords,
+        attrs={
+            "long_name": "Wet Bulb Potential Temperature",
+            "units": "K",
+        },
+    )
+
+    return radiosonde_dataset
 
 
 def calculate_height_from_geopotential(profile: xr.Dataset | xr.DataTree):
@@ -318,6 +377,135 @@ def calculate_li(radiosonde_dataset: xr.Dataset | xr.DataTree):
         coords={"sounding_num": radiosonde_dataset["sounding_num"]},
         attrs={
             "long_name": "Lifted Index",
+            "units": "Celsius",
+        },
+    )
+
+    return radiosonde_dataset
+
+
+def calculate_si(radiosonde_dataset: xr.Dataset | xr.DataTree):
+    """
+    Calculate the Showalter Index (SI) for each radiosonde in a dataset.
+    :param radiosonde_dataset: A dataset containing radiosonde profiles.
+    :return: A dataset updated with the SI for each radiosonde.
+    """
+
+    p = radiosonde_dataset['p']
+    ta = radiosonde_dataset['ta']
+    td = radiosonde_dataset['td']
+
+    def calc_si(pressure, temperature, dewpoint):
+        """Calculate the SI and return the magnitude."""
+
+        press = pressure * units.hPa
+        temp = temperature * units.kelvin
+        dew = dewpoint * units.kelvin
+
+        _si = mpcalc.showalter_index(
+            pressure=press,
+            temperature=temp,
+            dewpoint=dew
+        )
+
+        return _si.magnitude.item()
+
+    si = xr.apply_ufunc(
+        calc_si,
+        p,
+        ta,
+        td,
+        input_core_dims=[
+            ["p"],
+            ["p"],
+            ["p"],
+        ],
+        output_core_dims=[[]],
+        vectorize=True,
+        dask="parallelized",
+        output_dtypes=[float],
+    )
+
+    radiosonde_dataset['si'] = xr.DataArray(
+        si,
+        dims=("sounding_num",),
+        coords={"sounding_num": radiosonde_dataset["sounding_num"]},
+        attrs={
+            "long_name": "Showalter Index",
+            "units": "Delta Degree Celsius",
+        },
+    )
+
+    return radiosonde_dataset
+
+
+def calculate_ri(radiosonde_dataset: xr.Dataset | xr.DataTree):
+    """
+    Calculates the Rackliff Index (RI) using
+        theta_w_900 - T_500
+
+    :param radiosonde_dataset: A dataset containing radiosonde profiles.
+    :return: A dataset updated with the RI for each radiosonde.
+    """
+
+    theta_w_900 = radiosonde_dataset['theta_w'].sel(
+        p=900, method='nearest'
+    )
+
+    ta_500 = radiosonde_dataset['ta'].sel(
+        p=500, method='nearest'
+    )
+
+    ri = theta_w_900 - ta_500
+
+    radiosonde_dataset['ri'] = xr.DataArray(
+        ri,
+        dims=("sounding_num",),
+        coords={"sounding_num": radiosonde_dataset["sounding_num"]},
+        attrs={
+            "long_name": "Rackliff Index",
+            "units": "Delta Degree Celsius",
+        },
+    )
+
+    return radiosonde_dataset
+
+
+def calculate_ji(radiosonde_dataset: xr.Dataset | xr.DataTree):
+    """
+    Calculate the Jefferson Index (JI) using
+        0.6 * theta_w_850 -  T_500 - 0.5(T_700 - T_d_700) - 8
+
+    :param radiosonde_dataset: A dataset containing radiosonde profiles.
+    :return: A dataset updated with the JI for each radiosonde.
+    """
+
+    eight: int = 8
+
+    theta_w_850 = radiosonde_dataset["theta_w"].sel(
+        p=850, method='nearest'
+    )
+
+    ta_500 = radiosonde_dataset['ta'].sel(
+        p=500, method='nearest'
+    )
+
+    ta_700 = radiosonde_dataset['ta'].sel(
+        p=700, method='nearest'
+    )
+
+    td_700 = radiosonde_dataset['td'].sel(
+        p=700, method='nearest'
+    )
+
+    ji = (0.6 * theta_w_850) - ta_500 - (0.5 * (ta_700 - td_700)) - eight  #;)
+
+    radiosonde_dataset['ji'] = xr.DataArray(
+        ji,
+        dims=("sounding_num",),
+        coords={"sounding_num": radiosonde_dataset["sounding_num"]},
+        attrs={
+            "long_name": "Jefferson Index",
             "units": "Celsius",
         },
     )

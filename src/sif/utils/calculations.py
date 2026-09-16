@@ -196,9 +196,11 @@ def calculate_td_from_rh(radiosonde_dataset: xr.Dataset | xr.DataTree) -> xr.Dat
     return radiosonde_dataset
 
 
-def calculate_cape(radiosonde_dataset: xr.Dataset | xr.DataTree):
+def calculate_cape_with_loop(radiosonde_dataset: xr.Dataset | xr.DataTree):
     """
     Calculate CAPE and CIN from a collection of soundings.
+
+    The calculations are done using a loop.
 
     Parameters
     ----------
@@ -244,8 +246,7 @@ def calculate_cape(radiosonde_dataset: xr.Dataset | xr.DataTree):
     # Convert results back into xarray
     cape = xr.DataArray(
         cape_list,
-        dims=["sounding_num"],
-        coords={"sounding_num": radiosonde_dataset.sounding_num + 1},
+        dims=radiosonde_dataset["ta"].dims,
         attrs={
             "long_name": "Convective Available Potential Energy",
             "units": "J/Kg",
@@ -254,8 +255,7 @@ def calculate_cape(radiosonde_dataset: xr.Dataset | xr.DataTree):
 
     cin = xr.DataArray(
         cin_list,
-        dims=["sounding_num"],
-        coords={"sounding_num": radiosonde_dataset.sounding_num},
+        dims=radiosonde_dataset["ta"].dims,
         attrs={
             "long_name": "Convective Inhibition",
             "units": "J/Kg",
@@ -264,6 +264,70 @@ def calculate_cape(radiosonde_dataset: xr.Dataset | xr.DataTree):
 
     radiosonde_dataset["cape"] = cape
     radiosonde_dataset["cin"] = cin
+
+    return radiosonde_dataset
+
+
+def calculate_cape_cin(radiosonde_dataset: xr.Dataset | xr.DataTree):
+    """
+    Calcualtes the CAPE and CIN using array broadcasting.
+    :param radiosonde_dataset:
+    :return:
+    """
+
+    radiosonde_dataset = radiosonde_dataset.copy()
+
+    p = radiosonde_dataset["p"]
+    ta = radiosonde_dataset["ta"]
+    td = radiosonde_dataset["td"]
+
+    def calc_cape_cin(pressure, temperature, dewpoint):
+        """Calculate and return the CAPE and CIN."""
+
+        pres = pressure * units.hPa
+        temp = temperature * units.kelvin
+        dewp = dewpoint * units.kelvin
+
+        prof = mpcalc.parcel_profile(pres, temp[0], dewp[0])
+
+        _cape, _cin = mpcalc.cape_cin(
+            pres,
+            temp,
+            dewp,
+            prof
+        )
+
+        return _cape.magnitude, _cin.magnitude
+
+    cape, cin = xr.apply_ufunc(
+        calc_cape_cin,
+        p,
+        ta,
+        td,
+        input_core_dims=[["p"], ["p"], ["p"]],
+        output_core_dims=[[], []],
+        vectorize=True,
+        dask="parallelized",
+        output_dtypes=[float, float],
+    )
+
+    radiosonde_dataset["cape"] = xr.DataArray(
+        cape,
+        dims=radiosonde_dataset["ta"].dims[0:2],
+        attrs={
+            "long_name": "Convective Available Potential Energy",
+            "units": "J/Kg",
+        },
+    )
+
+    radiosonde_dataset["cin"] = xr.DataArray(
+        cin,
+        dims=radiosonde_dataset["ta"].dims[0:2],
+        attrs={
+            "long_name": "Convective Inhibition",
+            "units": "J/Kg",
+        },
+    )
 
     return radiosonde_dataset
 
@@ -282,9 +346,8 @@ def calculate_k_index(radiosonde_dataset: xr.Dataset | xr.DataTree):
     k = mpcalc.k_index(p.T, t.T, td.T).magnitude
 
     radiosonde_dataset["k_index"] = xr.DataArray(
-        k,
-        dims=("sounding_num",),
-        coords={"sounding_num": radiosonde_dataset["sounding_num"]},
+        k.T,
+        dims=radiosonde_dataset["ta"].dims[0:2],
         attrs={
             "long_name": "K-Index",
             "units": "Celsius",
@@ -308,9 +371,8 @@ def calculate_tt_index(radiosonde_dataset: xr.Dataset | xr.DataTree):
     tt = mpcalc.total_totals_index(p.T, ta.T, td.T).magnitude
 
     radiosonde_dataset["tt_index"] = xr.DataArray(
-        tt,
-        dims=("sounding_num",),
-        coords={"sounding_num": radiosonde_dataset["sounding_num"]},
+        tt.T,
+        dims=radiosonde_dataset["ta"].dims[0:2],
         attrs={
             "long_name": "Totals Totals Index",
             "units": "Celsius",
@@ -373,8 +435,7 @@ def calculate_li(radiosonde_dataset: xr.Dataset | xr.DataTree):
 
     radiosonde_dataset["li"] = xr.DataArray(
         li,
-        dims=("sounding_num",),
-        coords={"sounding_num": radiosonde_dataset["sounding_num"]},
+        dims=radiosonde_dataset["ta"].dims[0:2],
         attrs={
             "long_name": "Lifted Index",
             "units": "Celsius",
@@ -428,8 +489,7 @@ def calculate_si(radiosonde_dataset: xr.Dataset | xr.DataTree):
 
     radiosonde_dataset['si'] = xr.DataArray(
         si,
-        dims=("sounding_num",),
-        coords={"sounding_num": radiosonde_dataset["sounding_num"]},
+        dims=radiosonde_dataset["ta"].dims[0:2],
         attrs={
             "long_name": "Showalter Index",
             "units": "Delta Degree Celsius",
@@ -460,8 +520,7 @@ def calculate_ri(radiosonde_dataset: xr.Dataset | xr.DataTree):
 
     radiosonde_dataset['ri'] = xr.DataArray(
         ri,
-        dims=("sounding_num",),
-        coords={"sounding_num": radiosonde_dataset["sounding_num"]},
+        dims=radiosonde_dataset["ta"].dims[0:2],
         attrs={
             "long_name": "Rackliff Index",
             "units": "Delta Degree Celsius",
@@ -498,16 +557,127 @@ def calculate_ji(radiosonde_dataset: xr.Dataset | xr.DataTree):
         p=700, method='nearest'
     )
 
-    ji = (0.6 * theta_w_850) - ta_500 - (0.5 * (ta_700 - td_700)) - eight  #;)
+    ji = (0.6 * theta_w_850) - ta_500 - (0.5 * (ta_700 - td_700)) - eight  # ;)
 
     radiosonde_dataset['ji'] = xr.DataArray(
         ji,
-        dims=("sounding_num",),
-        coords={"sounding_num": radiosonde_dataset["sounding_num"]},
+        dims=radiosonde_dataset["ta"].dims[0:2],
         attrs={
             "long_name": "Jefferson Index",
-            "units": "Celsius",
+            "units": "Delta Degree Celsius",
         },
     )
 
     return radiosonde_dataset
+
+
+def calculate_pwbi(radiosonde_dataset: xr.Dataset | xr.DataTree):
+    """
+    Calculate the Potential Wet Bulb Index (PWBI).
+    :param radiosonde_dataset:
+    :return:
+    """
+    ...
+
+
+def calculate_ciir(radiosonde_dataset: xr.Dataset | xr.DataTree):
+    """
+    Calculate the Convective Instability Index of Reap
+    :param radiosonde_dataset:
+    :return:
+    """
+    ...
+
+
+def calculate_ko(radiosonde_dataset: xr.Dataset | xr.DataTree):
+    """
+    Calculate the Konvectionsindex (KO)
+    :param radiosonde_dataset:
+    :return:
+    """
+    ...
+
+
+def calculate_bi(radiosonde_dataset: xr.Dataset | xr.DataTree):
+    """
+    Calculate the Boyden Index (BI)
+    :param radiosonde_dataset:
+    :return:
+    """
+    ...
+
+
+def calculate_brn(radiosonde_dataset: xr.Dataset | xr.DataTree):
+    """
+    Calculate the Bulk Richardson Number (BRN)
+    :param radiosonde_dataset:
+    :return:
+    """
+    ...
+
+
+def calculate_pw(radiosonde_dataset: xr.Dataset | xr.DataTree):
+    """
+    Calculate the Precipitable Water (PW) for each radiosonde in a dataset.
+    :param radiosonde_dataset: A dataset containing radiosonde profiles.
+    :return: A dataset updated with the PW for each radiosonde.
+    """
+
+    p = radiosonde_dataset['p']
+    td = radiosonde_dataset['td']
+
+    def calc_pw(pressure, dewpoint):
+        """Calculate and return PW."""
+
+        pres = pressure * units.hPa
+        dew = dewpoint * units.kelvin
+
+        _pw = mpcalc.precipitable_water(
+            pressure=pres,
+            dewpoint=dew
+        )
+
+        return _pw.magnitude.item()
+
+    pw = xr.apply_ufunc(
+        calc_pw,
+        p,
+        td,
+        input_core_dims=[
+            ["p"],
+            ["p"],
+        ],
+        output_core_dims=[[]],
+        vectorize=True,
+        dask="parallelized",
+        output_dtypes=[float],
+    )
+
+    radiosonde_dataset['pw'] = xr.DataArray(
+        pw,
+        dims=radiosonde_dataset["ta"].dims[0:2],
+        attrs={
+            "long_name": "Precipitable Water",
+            "units": "millimeter",
+        },
+    )
+
+    return radiosonde_dataset
+
+
+def round_to_synoptic_hour(times: np.ndarray):
+    """Rounds launch times for radiosondes to the nearest synoptic hour."""
+
+    synoptic_hours = np.array([0, 6, 12, 18])
+
+    hours = times.astype('datetime64[h]').astype(int) % 24
+    nearest = synoptic_hours[
+        np.argmin(
+            np.abs(hours[:, None] - synoptic_hours),
+            axis=1
+        )
+    ]
+
+    rounded = times.astype("datetime64[D]") + nearest.astype("timedelta64[h]")
+
+    return rounded

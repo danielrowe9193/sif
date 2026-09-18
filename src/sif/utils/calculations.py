@@ -557,7 +557,7 @@ def calculate_ji(radiosonde_dataset: xr.Dataset | xr.DataTree):
         p=700, method='nearest'
     )
 
-    ji = (0.6 * theta_w_850) - ta_500 - (0.5 * (ta_700 - td_700)) - eight  # ;)
+    ji = (1.6 * theta_w_850) - ta_500 - (0.5 * (ta_700 - td_700)) - eight  # ;)
 
     radiosonde_dataset['ji'] = xr.DataArray(
         ji,

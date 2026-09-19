@@ -2,7 +2,7 @@ import cartopy.crs as ccrs
 import cartopy.feature as cfeature
 import matplotlib.pyplot as plt
 import numpy as np
-import src.sif.utils.file_management as fm
+import utils.file_management as fm
 import xarray as xr
 
 from metpy.plots import Hodograph, SkewT

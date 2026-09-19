@@ -1,20 +1,19 @@
-import src.sif.utils.file_management as fm
-import src.sif.utils.plot as plot
-import src.sif.observations.radiosondes as rs
+import utils.file_management as fm
+import utils.plot as plot
+# import src.sif.observations.radiosondes as rs
 
-
-from src.sif.models import forecast_radiosondes
+from models import forecast_radiosondes
 
 # Rename files so there are sorted by date.
 fm.rename_mwx(fm.MWX_DIR)
 
 # Read radiosondes and build level0 to level2 datasets. Save the datasets.
-radiosondes_pipeline = rs.RadiosondePipeline(
-    mwx_dir=fm.MWX_DIR
-)
-radiosondes_pipeline.run_sif_ptu_pipeline()
-radiosondes_pipeline.run_sif_std_plvl_pipeline()
-radiosondes_pipeline.run_igra_pipeline()
+# radiosondes_pipeline = rs.RadiosondePipeline(
+#     mwx_dir=fm.MWX_DIR
+# )
+# radiosondes_pipeline.run_sif_ptu_pipeline()
+# radiosondes_pipeline.run_sif_std_plvl_pipeline()
+# radiosondes_pipeline.run_igra_pipeline()
 
 # Create IFS level-0 and level-1 datasets
 ifs_level_zero = forecast_radiosondes.IFSLevelZero()

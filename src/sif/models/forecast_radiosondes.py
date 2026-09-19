@@ -156,12 +156,20 @@ class IFSLevelOne:
         -------
         None
         """
+        # Force dimensions to be in the required order for calculations.
+        self.dataset = self.dataset.transpose("station", "valid_time", "p", "soilLayer")
+
         self.dataset = calc.calculate_td_from_q(self.dataset)
+        self.dataset = calc.calculate_potential_temperature(self.dataset)
+        self.dataset = calc.calculate_wet_bulb_potential_temperature(self.dataset)
         self.dataset = calc.calculate_height_from_geopotential(self.dataset)
-        self.dataset = calc.calculate_cape(self.dataset)
+        self.dataset = calc.calculate_cape_cin(self.dataset)
         self.dataset = calc.calculate_k_index(self.dataset)
         self.dataset = calc.calculate_tt_index(self.dataset)
         self.dataset = calc.calculate_li(self.dataset)
+        self.dataset = calc.calculate_ji(self.dataset)
+        self.dataset = calc.calculate_ri(self.dataset)
+        self.dataset = calc.calculate_pw(self.dataset)
 
         return None
 

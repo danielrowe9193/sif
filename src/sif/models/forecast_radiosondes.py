@@ -347,7 +347,7 @@ class GFSLevelOne:
 
         return None
 
-    def export_ifs_level_one_ds(self) -> None:
+    def export_gfs_level_one_ds(self) -> None:
         """
         Export the Level‑1 dataset to NETCDF.
 
@@ -390,7 +390,7 @@ class ForecastRadiosondePipeline:
 
         lvl1 = GFSLevelOne(lvl0)
         lvl1.build_gfs_level_one_ds()
-        lvl1.export_ifs_level_one_ds()
+        lvl1.export_gfs_level_one_ds()
 
         return None
 

@@ -403,8 +403,39 @@ class SIFRadiosondesLevel2:
         Constructs the level 2 dataset.
 
         Perform relevant calculations.
+
+        Add weather state information to the dataset. Weather states are defined subjectively
+        use images of the sky and satellite imagery at the time of the radiosonde launch.
         :return:
         """
+
+        weather_states = [
+            (1, 2),  # 2026-08-11 17:29 UTC
+            (2, 2),  # 2026-08-12 11:02 UTC
+            (3, 1),  # 2026-08-12 17:02 UTC
+            (4, 1),  # 2026-08-13 11:10 UTC
+            (5, 1),  # 2026-08-13 17:02 UTC
+            (6, 1),  # 2026-08-14 10:52 UTC
+            (7, 2),  # 2026-08-14 16:51 UTC
+            (8, 3),  # 2026-08-15 04:59 UTC
+            (9, 4),  # 2026-08-15 11:02 UTC
+            (10, 3),  # 2026-08-15 17:30 UTC
+            (11, 3),  # 2026-08-18 10:52 UTC
+            (12, 4),  # 2026-08-19 05:05 UTC
+            (13, 4),  # 2026-08-19 11:22 UTC
+            (14, 5)  # 2026-08-20 11:01 UTC
+        ]
+
+        weather_index_description = {
+            '1': 'Cloudless / strong ridging / strong inversion',
+            '2': 'Fair weather Cu / Shallow convection / fair weather',
+            '3': 'Good weather / Larger Cu / Sc / Isolated light precipitation',
+            '4': 'Moderate weather / TCU / Heavy Precipitation / Isolated TS',
+            '5': 'Bad weather / CBs / Heavy rainfall',
+            '6': 'Severe weather / Hail / Tornadoes / Damaging winds'
+        }
+
+        weather_index = np.array([[weather_state for sounding_num, weather_state in weather_states]])
 
         # Perform calculations
         self.ptu_radiosonde_ds = calc.calculate_potential_temperature(self.radiosondes_lvl1.ptu_radiosonde_ds)
@@ -424,6 +455,16 @@ class SIFRadiosondesLevel2:
             self.ptu_radiosonde_ds.launch_time.values
         )
 
+        self.ptu_radiosonde_ds['weather_index'] = xr.DataArray(
+            weather_index,
+            dims=('station', 'sounding_num'),
+            attrs={
+                'long_name': 'weather index',
+                'units': 'Dimensionless',
+                'description': str(weather_index_description)
+            }
+        )
+
         return self.ptu_radiosonde_ds
 
     def build_std_plvl_radiosondes_lvl2(self):
@@ -433,6 +474,34 @@ class SIFRadiosondesLevel2:
         Removes bad radiosondes from the dataset.
         :return:
         """
+
+        weather_states = [
+            (1, 2),  # 2026-08-11 17:29 UTC
+            (2, 2),  # 2026-08-12 11:02 UTC
+            (3, 1),  # 2026-08-12 17:02 UTC
+            (4, 1),  # 2026-08-13 11:10 UTC
+            (5, 1),  # 2026-08-13 17:02 UTC
+            (6, 1),  # 2026-08-14 10:52 UTC
+            (7, 2),  # 2026-08-14 16:51 UTC
+            (8, 3),  # 2026-08-15 04:59 UTC
+            (9, 4),  # 2026-08-15 11:02 UTC
+            (10, 3),  # 2026-08-15 17:30 UTC
+            (11, 3),  # 2026-08-18 10:52 UTC
+            (12, 4),  # 2026-08-19 05:05 UTC
+            (13, 4),  # 2026-08-19 11:22 UTC
+            (14, 5)  # 2026-08-20 11:01 UTC
+        ]
+
+        weather_index_description = {
+            '1': 'Cloudless / strong ridging / strong inversion',
+            '2': 'Fair weather Cu / Shallow convection / fair weather',
+            '3': 'Good weather / Larger Cu / Sc / Isolated light precipitation',
+            '4': 'Moderate weather / TCU / Heavy Precipitation / Isolated TS',
+            '5': 'Bad weather / CBs / Heavy rainfall',
+            '6': 'Severe weather / Hail / Tornadoes / Damaging winds'
+        }
+
+        weather_index = np.array([[weather_state for sounding_num, weather_state in weather_states]])
 
         # Perform calculations
         self.std_plvl_radiosonde_ds = calc.calculate_potential_temperature(self.radiosondes_lvl1.std_plvl_radiosonde_ds)
@@ -450,6 +519,16 @@ class SIFRadiosondesLevel2:
 
         self.std_plvl_radiosonde_ds['launch_time'] = calc.round_to_synoptic_hour(
             self.std_plvl_radiosonde_ds.launch_time.values
+        )
+
+        self.std_plvl_radiosonde_ds['weather_index'] = xr.DataArray(
+            weather_index,
+            dims=('station', 'sounding_num'),
+            attrs={
+                'long_name': 'weather index',
+                'units': 'Dimensionless',
+                'description': str(weather_index_description)
+            }
         )
 
         return self.std_plvl_radiosonde_ds
@@ -483,8 +562,6 @@ class IGRARadiosondesLevel0:
 
         updated_datasets = []
 
-        print(self.datasets)
-
         for dataset in self.datasets:
             dataset = dataset.expand_dims(
                 {
@@ -492,8 +569,6 @@ class IGRARadiosondesLevel0:
                 }
             )
             updated_datasets.append(dataset)
-
-        print(updated_datasets)
 
         self.igra_lvl0_dataset = xr.concat(
             updated_datasets,

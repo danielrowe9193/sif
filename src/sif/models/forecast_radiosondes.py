@@ -186,8 +186,133 @@ class IFSLevelOne:
 
 
 class GFSLevelZero:
-    ...
+    """
+    Build Level‑0 GFS radiosonde forecast datasets.
+
+    This class collects raw GFS forecast files, loads them into xarray
+    datasets, applies basic preprocessing (sorting, coordinate assignment,
+    renaming), and concatenates them into a single Level‑0 dataset.
+    """
+
+    def __init__(self):
+        """
+        Initialize an IFSLevelZero instance.
+        """
+        self.data_dir = fm.GFS_DIR
+
+        self._gfs_path_list = []
+        self._gfs_ds_list = []
+
+        self.dataset: None | xr.Dataset = None
+        self.dataset_filepath = (
+            fm.GFS_DIR / "gfs.radiosondes.profiles.level0.nc"
+        )
+
+    def collect_fc_file_paths(self) -> None:
+        """
+        Collect file paths for all GFS forecast files.
+
+        The method searches the GFS directory for subdirectories matching
+        `2026-08*` and collects all files beginning with `ALL*`.
+
+        Returns
+        -------
+        None
+        """
+        for gfs_dir in self.data_dir.glob("2026-08*"):
+            for fc_data in gfs_dir.glob("ALL*"):
+                self._gfs_path_list.append(fc_data)
+
+        return None
+
+    def build_gfs_level_zero_ds(self) -> None:
+        """
+        Build the Level‑0 GFS dataset.
+
+        This method loads each collected forecast file, sorts by `valid_time`,
+        assigns forecast-hour coordinates (`12h`, `24h`, `48h`), computes the
+        initialization time, renames key variables, and stores each processed
+        dataset. Finally, all datasets are concatenated along the `valid_time`
+        dimension.
+
+        Returns
+        -------
+        None
+        """
+        for fc_data_path in sorted(self._gfs_path_list):
+            gfs_ds = xr.open_dataset(fc_data_path)
+            gfs_ds = gfs_ds.sortby("valid_time")
+
+            # Assign forecast-hour coordinate
+            gfs_ds = gfs_ds.assign_coords(
+                forecast_hour=("valid_time", ["12h", "24h", "48h"])
+            )
+
+            # Compute initialization time
+            init_time = gfs_ds.sel(
+                forecast_hour="12h"
+            ).valid_time.values - np.timedelta64(12, "h")
+
+            gfs_ds = gfs_ds.assign_coords(
+                init_time=("valid_time", [init_time, init_time, init_time])
+            )
+
+            # # Rename variables
+            # gfs_ds = gfs_ds.rename(
+            #     {
+            #         "isobaricInhPa": "p",
+            #         "t": "ta",
+            #     }
+            # )
+
+            self._gfs_ds_list.append(gfs_ds)
+
+        self.dataset = xr.concat(self._gfs_ds_list, dim="valid_time")
+
+        return None
+
+    def export_ifs_level_zero_ds(self) -> None:
+        """
+        Export the Level‑0 dataset to NETCDF.
+
+        Returns
+        -------
+        None
+        """
+        self.dataset.to_netcdf(self.dataset_filepath)
+        return None
     
 
 class GFSLevelOne:
     ...
+
+
+class ForecastRadiosondePipeline:
+    """
+    Orchestrates the full workflow for forecast radiosondes:
+        Collect forecast radiosonde -> Build dataset -> Export
+    """
+
+    @staticmethod
+    def run_ifs_pipeline():
+        """Run IFS radiosondes through Level 0 -> Level 1."""
+
+        lvl0 = IFSLevelZero()
+        lvl0.collect_fc_file_paths()
+        lvl0.build_ifs_level_zero_ds()
+        lvl0.export_ifs_level_zero_ds()
+
+        lvl1 = IFSLevelOne(lvl0)
+        lvl1.build_ifs_level_one_ds()
+        lvl1.export_ifs_level_one_ds()
+
+        return None
+
+    @staticmethod
+    def run_gfs_pipeline():
+        """Run GFS radiosondes through Level 0 -> Level 1."""
+        lvl0 = GFSLevelZero()
+        lvl0.collect_fc_file_paths()
+        lvl0.build_gfs_level_zero_ds()
+        lvl0.export_ifs_level_zero_ds()
+

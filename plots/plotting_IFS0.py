@@ -5,7 +5,7 @@ import matplotlib.pyplot as plt
 from metpy.units import units
 from metpy.calc import dewpoint_from_specific_humidity
 from matplotlib.ticker import NullFormatter, FixedLocator, FixedFormatter
-
+from matplotlib.lines import Line2D
 
 ds = xr.open_dataset("/Users/appa/Desktop/Masters/Semester2/Experimental_Meterology/sif/data/level0/ifs.radiosondes.profiles.level0.nc")
 
@@ -188,6 +188,7 @@ def plot_cross_section(ds, time, station_order=None):
         dewpoint_x,
         levels=dewpoint_levels,
         colors="limegreen",
+
         linewidths=1.5
     )
 
@@ -327,8 +328,28 @@ def plot_cross_section(ds, time, station_order=None):
 
     cbar = fig.colorbar(cf, ax=ax, pad=0.02)
     cbar.set_label("Temperature (°C)")
-    ax.grid(True, which="major", linestyle="--",alpha=0.25)
+    ax.grid(True, which="major", linestyle="--",alpha=0.25) 
 
+    legend_lines = [
+        Line2D(
+            [0], [0],
+            color="black",
+            linewidth=1.0,
+            label="Temperature (°C)"
+        ),
+        Line2D(
+            [0], [0],
+            color="limegreen",
+            linewidth=1.5,
+            label="Dewpoint (°C)"
+        )
+    ]
+
+    ax.legend(
+        handles=legend_lines,
+        loc="upper right"
+    )
+    
     plt.tight_layout()
     plt.show()
 

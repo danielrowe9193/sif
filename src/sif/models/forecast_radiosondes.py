@@ -1,9 +1,9 @@
 import numpy as np
+import src.sif.utils.calculations as calc
+import src.sif.utils.file_management as fm
 import xarray as xr
 
 from src.sif.utils.config import Constants
-from pathlib import Path
-from src.sif.utils.utils import CalcUtils, FileManagement
 
 xr.set_options(use_new_combine_kwarg_defaults=True)
 
@@ -24,14 +24,14 @@ class IFSLevelZero:
         """
         Initialize an IFSLevelZero instance.
         """
-        self.data_dir = FileManagement.IFS_DIR
+        self.data_dir = fm.IFS_DIR
 
         self._ifs_path_list = []
         self._ifs_ds_list = []
 
         self.dataset: None | xr.Dataset = None
         self.dataset_filepath = (
-            FileManagement.IFS_DIR / "ifs.radiosondes.profiles.level0.nc"
+            fm.IFS_DIR / "ifs.radiosondes.profiles.level0.nc"
         )
 
     def collect_fc_file_paths(self) -> None:
@@ -134,7 +134,7 @@ class IFSLevelOne:
 
         self.dataset = xr.open_dataset(self.ifs_level_zero.dataset_filepath)
         self.dataset_filepath = (
-            FileManagement.IFS_DIR / "ifs.radiosondes.profiles.level1.nc"
+            fm.IFS_DIR / "ifs.radiosondes.profiles.level1.nc"
         )
 
     def build_ifs_level_one_ds(self) -> None:
@@ -156,12 +156,20 @@ class IFSLevelOne:
         -------
         None
         """
-        self.dataset = CalcUtils.calculate_td_from_q(self.dataset)
-        self.dataset = CalcUtils.calculate_height_from_geopotential(self.dataset)
-        self.dataset = CalcUtils.calculate_cape(self.dataset)
-        self.dataset = CalcUtils.calculate_k_index(self.dataset)
-        self.dataset = CalcUtils.calculate_tt_index(self.dataset)
-        self.dataset = CalcUtils.calculate_li(self.dataset)
+        # Force dimensions to be in the required order for calculations.
+        self.dataset = self.dataset.transpose("station", "valid_time", "p", "soilLayer")
+
+        self.dataset = calc.calculate_td_from_q(self.dataset)
+        self.dataset = calc.calculate_potential_temperature(self.dataset)
+        self.dataset = calc.calculate_wet_bulb_potential_temperature(self.dataset)
+        self.dataset = calc.calculate_height_from_geopotential(self.dataset)
+        self.dataset = calc.calculate_cape_cin(self.dataset)
+        self.dataset = calc.calculate_k_index(self.dataset)
+        self.dataset = calc.calculate_tt_index(self.dataset)
+        self.dataset = calc.calculate_li(self.dataset)
+        self.dataset = calc.calculate_ji(self.dataset)
+        self.dataset = calc.calculate_ri(self.dataset)
+        self.dataset = calc.calculate_pw(self.dataset)
 
         return None
 
@@ -175,3 +183,220 @@ class IFSLevelOne:
         """
         self.dataset.to_netcdf(self.dataset_filepath)
         return None
+
+
+class GFSLevelZero:
+    """
+    Build Level‑0 GFS radiosonde forecast datasets.
+
+    This class collects raw GFS forecast files, loads them into xarray
+    datasets, applies basic preprocessing (sorting, coordinate assignment,
+    renaming), and concatenates them into a single Level‑0 dataset.
+    """
+
+    def __init__(self):
+        """
+        Initialize an IFSLevelZero instance.
+        """
+        self.data_dir = fm.GFS_DIR
+
+        self._gfs_path_list = []
+        self._gfs_ds_list = []
+
+        self.dataset: None | xr.Dataset = None
+        self.dataset_filepath = (
+            fm.GFS_DIR / "gfs.radiosondes.profiles.level0.nc"
+        )
+
+    def collect_fc_file_paths(self) -> None:
+        """
+        Collect file paths for all GFS forecast files.
+
+        The method searches the GFS directory for subdirectories matching
+        `2026-08*` and collects all files beginning with `ALL*`.
+
+        Returns
+        -------
+        None
+        """
+        for gfs_dir in self.data_dir.glob("2026-08*"):
+            for fc_data in gfs_dir.glob("ALL*"):
+                self._gfs_path_list.append(fc_data)
+
+        return None
+
+    def build_gfs_level_zero_ds(self) -> None:
+        """
+        Build the Level‑0 GFS dataset.
+
+        This method loads each collected forecast file, sorts by `valid_time`,
+        assigns forecast-hour coordinates (`12h`, `24h`, `48h`), computes the
+        initialization time, renames key variables, and stores each processed
+        dataset. Finally, all datasets are concatenated along the `valid_time`
+        dimension.
+
+        Returns
+        -------
+        None
+        """
+        for fc_data_path in sorted(self._gfs_path_list):
+            gfs_ds = xr.open_dataset(fc_data_path)
+            gfs_ds = gfs_ds.sortby("valid_time")
+
+            # Assign forecast-hour coordinate
+            gfs_ds = gfs_ds.assign_coords(
+                forecast_hour=("valid_time", ["anal", "12h", "24h", "48h"])
+            )
+
+            # Compute initialization time
+            init_time = gfs_ds.sel(
+                forecast_hour="anal"
+            ).valid_time.values
+
+            gfs_ds = gfs_ds.assign_coords(
+                init_time=("valid_time", [init_time, init_time, init_time, init_time])
+            )
+
+            # Rename variables
+            gfs_ds = gfs_ds.rename(
+                {
+                    "t": "ta",
+                    "height": "z",
+                }
+            )
+
+            self._gfs_ds_list.append(gfs_ds)
+
+        self.dataset = xr.concat(self._gfs_ds_list, dim="valid_time")
+
+        return None
+
+    def export_ifs_level_zero_ds(self) -> None:
+        """
+        Export the Level‑0 dataset to NETCDF.
+
+        Returns
+        -------
+        None
+        """
+        self.dataset.to_netcdf(self.dataset_filepath)
+        return None
+    
+
+class GFSLevelOne:
+    """
+    Build Level‑1 IFS radiosonde forecast datasets.
+
+    Level‑1 processing applies derived thermodynamic indices (CAPE, K‑index,
+    TT‑index, Lifted Index) to the Level‑0 dataset and exports the result.
+    """
+
+    def __init__(self, gfs_level_zero: GFSLevelZero):
+        """
+        Initialize an GFSLevelOne instance.
+
+        Parameters
+        ----------
+        gfs_level_zero : GFSLevelZero
+            A fully initialized Level‑ 0 processor.
+
+        Notes
+        -----
+        The Level‑ 0 dataset is loaded from disk and stored as `self.dataset`.
+        """
+        self.gfs_level_zero = gfs_level_zero
+
+        self.dataset = xr.open_dataset(self.gfs_level_zero.dataset_filepath)
+        self.dataset_filepath = (
+            fm.GFS_DIR / "gfs.radiosondes.profiles.level1.nc"
+        )
+
+    def build_gfs_level_one_ds(self) -> None:
+        """
+        Compute Level‑1 thermodynamic indices.
+
+        This method applies several derived meteorological indices to the
+        Level‑0 dataset:
+
+        - Dewpoint Temperature
+        - CAPE (Convective Available Potential Energy)
+        - K‑index
+        - TT‑index (Total Totals)
+        - Lifted Index (LI)
+
+        All calculations are delegated to `CalcUtils`.
+
+        Returns
+        -------
+        None
+        """
+        # Force dimensions to be in the required order for calculations.
+        self.dataset = self.dataset.transpose("station", "valid_time", "p")
+
+        self.dataset = calc.calculate_td_from_q(self.dataset)
+        self.dataset = calc.calculate_potential_temperature(self.dataset)
+        self.dataset = calc.calculate_wet_bulb_potential_temperature(self.dataset)
+        self.dataset = calc.calculate_height_from_geopotential(self.dataset)
+        self.dataset = calc.calculate_cape_cin(self.dataset)
+        self.dataset = calc.calculate_k_index(self.dataset)
+        self.dataset = calc.calculate_tt_index(self.dataset)
+        self.dataset = calc.calculate_li(self.dataset)
+        self.dataset = calc.calculate_ji(self.dataset)
+        self.dataset = calc.calculate_ri(self.dataset)
+        self.dataset = calc.calculate_pw(self.dataset)
+
+        return None
+
+    def export_gfs_level_one_ds(self) -> None:
+        """
+        Export the Level‑1 dataset to NETCDF.
+
+        Returns
+        -------
+        None
+        """
+        self.dataset.to_netcdf(self.dataset_filepath)
+        return None
+
+
+class ForecastRadiosondePipeline:
+    """
+    Orchestrates the full workflow for forecast radiosondes:
+        Collect forecast radiosonde -> Build dataset -> Export
+    """
+
+    @staticmethod
+    def run_ifs_pipeline():
+        """Run IFS radiosondes through Level 0 -> Level 1."""
+
+        lvl0 = IFSLevelZero()
+        lvl0.collect_fc_file_paths()
+        lvl0.build_ifs_level_zero_ds()
+        lvl0.export_ifs_level_zero_ds()
+
+        lvl1 = IFSLevelOne(lvl0)
+        lvl1.build_ifs_level_one_ds()
+        lvl1.export_ifs_level_one_ds()
+
+        return None
+
+    @staticmethod
+    def run_gfs_pipeline():
+        """Run GFS radiosondes through Level 0 -> Level 1."""
+        lvl0 = GFSLevelZero()
+        lvl0.collect_fc_file_paths()
+        lvl0.build_gfs_level_zero_ds()
+        lvl0.export_ifs_level_zero_ds()
+
+        lvl1 = GFSLevelOne(lvl0)
+        lvl1.build_gfs_level_one_ds()
+        lvl1.export_gfs_level_one_ds()
+
+        return None
+
+    @staticmethod
+    def run_icon_pipeline():
+        """Run ICON radiosondes through Level 0 -> Level 1."""
+
+        ...
+

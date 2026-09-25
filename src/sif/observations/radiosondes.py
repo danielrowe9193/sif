@@ -1,12 +1,11 @@
 import numpy as np
 import pandas as pd
-import src.sif.utils.utils as utils
+import src.sif.utils.calculations as calc
+import src.sif.utils.file_management as fm
 import xarray as xr
 import xml.etree.ElementTree as ET
 import zipfile
 
-from metpy.calc import dewpoint_from_relative_humidity
-from metpy.units import units
 from pathlib import Path
 
 
@@ -34,7 +33,7 @@ class Radiosonde:
         extracted .xml files.
         """
         self.filepath = Path(filepath)
-        self.extraction_dir = utils.FileManagement.XML_DIR / self.filepath.stem
+        self.extraction_dir = fm.XML_DIR / self.filepath.stem
         self.extraction_dir.mkdir(exist_ok="True")
 
     def extract_mwx(self) -> None:
@@ -162,7 +161,6 @@ class PTURadiosonde:
                 "lat": float(row.get("Latitude")),
                 "lon": float(row.get("Longitude")),
                 "sounding_id": row.get("SoundingIdPk"),
-
             }
             for row in self.root.findall("Row")
         ]
@@ -187,11 +185,6 @@ class PTURadiosonde:
         df = df.drop(columns="sounding_id").set_index("p")
 
         ds = df.to_xarray().sortby("p", ascending=False)
-
-        # ds['time'] = xr.apply_ufunc(
-        #     pd.to_datetime,
-        #     ds['time']
-        # )
 
         return ds
 
@@ -230,7 +223,7 @@ class Radiosondes:
             yield Radiosonde(filepath=file)
 
 
-class RadiosondesLevel0:
+class SIFRadiosondesLevel0:
     """
     Initial radiosonde dataset.
     Produces a combined xarray dataset.
@@ -263,6 +256,10 @@ class RadiosondesLevel0:
             ptu_radiosonde_ds_list, dim="sounding_num", join="outer"
         )
 
+        ptu_radiosonde_ds = ptu_radiosonde_ds.assign_coords(
+            sounding_num=np.arange(ptu_radiosonde_ds.sounding_num.size)
+        )
+
         self.ptu_radiosonde_ds = ptu_radiosonde_ds
         
         return ptu_radiosonde_ds        
@@ -289,12 +286,16 @@ class RadiosondesLevel0:
             'p', ascending=False
         )
 
+        std_plvl_radiosonde_ds.assign_coords(
+            sounding_num=np.arange(std_plvl_radiosonde_ds.sounding_num.size)
+        )
+
         self.std_plvl_radiosonde_ds = std_plvl_radiosonde_ds
         
         return std_plvl_radiosonde_ds
 
 
-class RadiosondesLevel1:
+class SIFRadiosondesLevel1:
     """
     Level 1 Processing of radiosonde dataset.
 
@@ -303,7 +304,7 @@ class RadiosondesLevel1:
 
     BAD_SOUNDING_INDICES = [0, 10]
 
-    def __init__(self, radiosondes_lvl0: RadiosondesLevel0):
+    def __init__(self, radiosondes_lvl0: SIFRadiosondesLevel0):
         """
 
         :param radiosondes_lvl0:
@@ -335,8 +336,14 @@ class RadiosondesLevel1:
 
         ptu_radiosonde_ds = ptu_radiosonde_ds.assign_coords(
             launch_time=(
-                'sounding_num', ptu_radiosonde_ds['time'].isel(p=0).data
+                'sounding_num', ptu_radiosonde_ds['time'].isel(p=0).data.astype('datetime64[ns]')
             )
+        )
+
+        ptu_radiosonde_ds = ptu_radiosonde_ds.expand_dims(
+            {
+                "station": ["Fehmarn"]
+            }
         )
 
         self.ptu_radiosonde_ds = ptu_radiosonde_ds
@@ -367,18 +374,24 @@ class RadiosondesLevel1:
             )
         )
 
+        std_plvl_radiosonde_ds = std_plvl_radiosonde_ds.expand_dims(
+            {
+                "station": ["Fehmarn"]
+            }
+        )
+
         self.std_plvl_radiosonde_ds = std_plvl_radiosonde_ds
 
         return std_plvl_radiosonde_ds
 
 
-class RadiosondesLevel2:
+class SIFRadiosondesLevel2:
 
     """
     Handles all computed variables and calculates stability indices for each radiosonde.
     """
 
-    def __init__(self, radiosondes_lvl1: RadiosondesLevel1):
+    def __init__(self, radiosondes_lvl1: SIFRadiosondesLevel1):
 
         self.radiosondes_lvl1 = radiosondes_lvl1
 
@@ -390,16 +403,67 @@ class RadiosondesLevel2:
         Constructs the level 2 dataset.
 
         Perform relevant calculations.
+
+        Add weather state information to the dataset. Weather states are defined subjectively
+        use images of the sky and satellite imagery at the time of the radiosonde launch.
         :return:
         """
 
-        # Perform calculations
-        self.ptu_radiosonde_ds = utils.CalcUtils.calculate_td_from_rh(self.radiosondes_lvl1.ptu_radiosonde_ds)
+        weather_states = [
+            (1, 2),  # 2026-08-11 17:29 UTC
+            (2, 2),  # 2026-08-12 11:02 UTC
+            (3, 1),  # 2026-08-12 17:02 UTC
+            (4, 1),  # 2026-08-13 11:10 UTC
+            (5, 1),  # 2026-08-13 17:02 UTC
+            (6, 1),  # 2026-08-14 10:52 UTC
+            (7, 2),  # 2026-08-14 16:51 UTC
+            (8, 3),  # 2026-08-15 04:59 UTC
+            (9, 4),  # 2026-08-15 11:02 UTC
+            (10, 3),  # 2026-08-15 17:30 UTC
+            (11, 3),  # 2026-08-18 10:52 UTC
+            (12, 4),  # 2026-08-19 05:05 UTC
+            (13, 4),  # 2026-08-19 11:22 UTC
+            (14, 5)  # 2026-08-20 11:01 UTC
+        ]
 
-        self.ptu_radiosonde_ds = utils.CalcUtils.calculate_cape(self.ptu_radiosonde_ds)
-        self.ptu_radiosonde_ds = utils.CalcUtils.calculate_tt_index(self.ptu_radiosonde_ds)
-        self.ptu_radiosonde_ds = utils.CalcUtils.calculate_k_index(self.ptu_radiosonde_ds)
-        self.ptu_radiosonde_ds = utils.CalcUtils.calculate_li(self.ptu_radiosonde_ds)
+        weather_index_description = {
+            '1': 'Cloudless / strong ridging / strong inversion',
+            '2': 'Fair weather Cu / Shallow convection / fair weather',
+            '3': 'Good weather / Larger Cu / Sc / Isolated light precipitation',
+            '4': 'Moderate weather / TCU / Heavy Precipitation / Isolated TS',
+            '5': 'Bad weather / CBs / Heavy rainfall',
+            '6': 'Severe weather / Hail / Tornadoes / Damaging winds'
+        }
+
+        weather_index = np.array([[weather_state for sounding_num, weather_state in weather_states]])
+
+        # Perform calculations
+        self.ptu_radiosonde_ds = calc.calculate_potential_temperature(self.radiosondes_lvl1.ptu_radiosonde_ds)
+        self.ptu_radiosonde_ds = calc.calculate_td_from_rh(self.radiosondes_lvl1.ptu_radiosonde_ds)
+        self.ptu_radiosonde_ds = calc.calculate_wet_bulb_potential_temperature(self.ptu_radiosonde_ds)
+
+        self.ptu_radiosonde_ds = calc.calculate_cape_cin(self.ptu_radiosonde_ds)
+        self.ptu_radiosonde_ds = calc.calculate_tt_index(self.ptu_radiosonde_ds)
+        self.ptu_radiosonde_ds = calc.calculate_k_index(self.ptu_radiosonde_ds)
+        self.ptu_radiosonde_ds = calc.calculate_li(self.ptu_radiosonde_ds)
+        self.ptu_radiosonde_ds = calc.calculate_si(self.ptu_radiosonde_ds)
+        self.ptu_radiosonde_ds = calc.calculate_ri(self.ptu_radiosonde_ds)
+        self.ptu_radiosonde_ds = calc.calculate_ji(self.ptu_radiosonde_ds)
+        self.ptu_radiosonde_ds = calc.calculate_pw(self.ptu_radiosonde_ds)
+
+        self.ptu_radiosonde_ds['launch_time'] = calc.round_to_synoptic_hour(
+            self.ptu_radiosonde_ds.launch_time.values
+        )
+
+        self.ptu_radiosonde_ds['weather_index'] = xr.DataArray(
+            weather_index,
+            dims=('station', 'sounding_num'),
+            attrs={
+                'long_name': 'weather index',
+                'units': 'Dimensionless',
+                'description': str(weather_index_description)
+            }
+        )
 
         return self.ptu_radiosonde_ds
 
@@ -411,23 +475,125 @@ class RadiosondesLevel2:
         :return:
         """
 
-        # Perform calculations
-        self.std_plvl_radiosonde_ds = utils.CalcUtils.calculate_td_from_rh(self.radiosondes_lvl1.std_plvl_radiosonde_ds)
+        weather_states = [
+            (1, 2),  # 2026-08-11 17:29 UTC
+            (2, 2),  # 2026-08-12 11:02 UTC
+            (3, 1),  # 2026-08-12 17:02 UTC
+            (4, 1),  # 2026-08-13 11:10 UTC
+            (5, 1),  # 2026-08-13 17:02 UTC
+            (6, 1),  # 2026-08-14 10:52 UTC
+            (7, 2),  # 2026-08-14 16:51 UTC
+            (8, 3),  # 2026-08-15 04:59 UTC
+            (9, 4),  # 2026-08-15 11:02 UTC
+            (10, 3),  # 2026-08-15 17:30 UTC
+            (11, 3),  # 2026-08-18 10:52 UTC
+            (12, 4),  # 2026-08-19 05:05 UTC
+            (13, 4),  # 2026-08-19 11:22 UTC
+            (14, 5)  # 2026-08-20 11:01 UTC
+        ]
 
-        self.std_plvl_radiosonde_ds = utils.CalcUtils.calculate_cape(self.std_plvl_radiosonde_ds)
-        self.std_plvl_radiosonde_ds = utils.CalcUtils.calculate_tt_index(self.std_plvl_radiosonde_ds)
-        self.std_plvl_radiosonde_ds = utils.CalcUtils.calculate_k_index(self.std_plvl_radiosonde_ds)
-        self.std_plvl_radiosonde_ds = utils.CalcUtils.calculate_li(self.std_plvl_radiosonde_ds)
+        weather_index_description = {
+            '1': 'Cloudless / strong ridging / strong inversion',
+            '2': 'Fair weather Cu / Shallow convection / fair weather',
+            '3': 'Good weather / Larger Cu / Sc / Isolated light precipitation',
+            '4': 'Moderate weather / TCU / Heavy Precipitation / Isolated TS',
+            '5': 'Bad weather / CBs / Heavy rainfall',
+            '6': 'Severe weather / Hail / Tornadoes / Damaging winds'
+        }
+
+        weather_index = np.array([[weather_state for sounding_num, weather_state in weather_states]])
+
+        # Perform calculations
+        self.std_plvl_radiosonde_ds = calc.calculate_potential_temperature(self.radiosondes_lvl1.std_plvl_radiosonde_ds)
+        self.std_plvl_radiosonde_ds = calc.calculate_td_from_rh(self.radiosondes_lvl1.std_plvl_radiosonde_ds)
+        self.std_plvl_radiosonde_ds = calc.calculate_wet_bulb_potential_temperature(self.std_plvl_radiosonde_ds)
+
+        self.std_plvl_radiosonde_ds = calc.calculate_cape_cin(self.std_plvl_radiosonde_ds)
+        self.std_plvl_radiosonde_ds = calc.calculate_tt_index(self.std_plvl_radiosonde_ds)
+        self.std_plvl_radiosonde_ds = calc.calculate_k_index(self.std_plvl_radiosonde_ds)
+        self.std_plvl_radiosonde_ds = calc.calculate_li(self.std_plvl_radiosonde_ds)
+        self.std_plvl_radiosonde_ds = calc.calculate_si(self.std_plvl_radiosonde_ds)
+        self.std_plvl_radiosonde_ds = calc.calculate_ri(self.std_plvl_radiosonde_ds)
+        self.std_plvl_radiosonde_ds = calc.calculate_ji(self.std_plvl_radiosonde_ds)
+        self.std_plvl_radiosonde_ds = calc.calculate_pw(self.std_plvl_radiosonde_ds)
+
+        self.std_plvl_radiosonde_ds['launch_time'] = calc.round_to_synoptic_hour(
+            self.std_plvl_radiosonde_ds.launch_time.values
+        )
+
+        self.std_plvl_radiosonde_ds['weather_index'] = xr.DataArray(
+            weather_index,
+            dims=('station', 'sounding_num'),
+            attrs={
+                'long_name': 'weather index',
+                'units': 'Dimensionless',
+                'description': str(weather_index_description)
+            }
+        )
 
         return self.std_plvl_radiosonde_ds
 
 
-class RadiosondesLevel3:
+class SIFRadiosondesLevel3:
     """
     Radiosondes from the 3 other stations combined with Fehmarn
     observations.
     """
     ...
+
+
+class IGRARadiosondesLevel0:
+    """
+    Uses radiosondes sourced from IGRA to create a concatenated dataset.
+    """
+
+    def __init__(self, filepaths: list[str] | list[Path]):
+        """
+        Use a list of filepaths containing IGRA sounding data to create a concatenated dataset.
+        :param filepaths: A list containing filepaths to data. Expects data to be .nc files, created using igra2_parser and igra2_requests.
+        """
+
+        self.filepaths = filepaths
+        self.datasets = [xr.open_dataset(filepath) for filepath in self.filepaths]
+        self.igra_lvl0_dataset: None | xr.Dataset | xr.DataTree = None
+
+    def build_igra_radiosondes_lvl0(self):
+        """Construct the level 0 dataset for IGRA radiosondes."""
+
+        updated_datasets = []
+
+        for dataset in self.datasets:
+            dataset = dataset.expand_dims(
+                {
+                    "station": [dataset.attrs.get('station_name')]
+                }
+            )
+            updated_datasets.append(dataset)
+
+        self.igra_lvl0_dataset = xr.concat(
+            updated_datasets,
+            dim='station',
+            join='outer'
+        )
+
+        return self.igra_lvl0_dataset
+
+
+class IGRARadiosondesLevel1:
+    """Calculate additional variables and rename variables to meet SIF requirements."""
+
+    def __init__(self, igra_radiosondes_lvl0: IGRARadiosondesLevel0):
+        """
+        Use level 0 IGRA radiosondes to build level 1 radiosonde dataset.
+        :param igra_radiosondes_lvl0:
+        """
+        self.igra_radiosondes_lvl0 = igra_radiosondes_lvl0
+
+    def build_igra_radiosondes_lvl1(self):
+        """Construct the level 1 dataset for IGRA radiosondes."""
+
+        # Rename variables
+        ...
 
 
 class RadiosondePipeline:
@@ -439,61 +605,77 @@ class RadiosondePipeline:
 
     def __init__(self, mwx_dir: str | Path):
         self.collection = Radiosondes(mwx_dir)
+        self.filepaths = [
+            fm.NETCDF_DIR / "Aug-2006-2026-GMM00010035.nc",
+            fm.NETCDF_DIR / "Aug-2006-2026-GMM00010113.nc",
+            fm.NETCDF_DIR / "Aug-2006-2026-GMM00010184.nc"
+        ]
 
-    def run_ptu_pipeline(self):
-        """Run PTU radiosondes through Level0 → Level1 → Level2."""
+    def run_sif_ptu_pipeline(self):
+        """Run SIF PTU radiosondes through Level0 → Level1 → Level2."""
 
-        lvl0 = RadiosondesLevel0(
+        lvl0 = SIFRadiosondesLevel0(
             radiosondes=self.collection
         )
         lvl0.build_ptu_radiosondes_lvl0()
         lvl0.ptu_radiosonde_ds.to_netcdf(
-            utils.FileManagement.NETCDF_DIR / "sif.ptu_radiosondes.profiles.level0.nc"
+            fm.NETCDF_DIR / "sif.ptu_radiosondes.profiles.level0.nc"
         )
 
-        lvl1 = RadiosondesLevel1(
+        lvl1 = SIFRadiosondesLevel1(
             radiosondes_lvl0=lvl0
         )
         lvl1.build_ptu_radiosondes_lvl1()
         lvl1.ptu_radiosonde_ds.to_netcdf(
-            utils.FileManagement.NETCDF_DIR / "sif.ptu_radiosondes.profiles.level1.nc"
+            fm.NETCDF_DIR / "sif.ptu_radiosondes.profiles.level1.nc"
         )
 
-        lvl2 = RadiosondesLevel2(
+        lvl2 = SIFRadiosondesLevel2(
             radiosondes_lvl1=lvl1
         )
         lvl2.build_ptu_radiosondes_lvl2()
         lvl2.ptu_radiosonde_ds.to_netcdf(
-            utils.FileManagement.NETCDF_DIR / "sif.ptu_radiosondes.profiles.level2.nc"
+            fm.NETCDF_DIR / "sif.ptu_radiosondes.profiles.level2.nc"
         )
 
         return None
 
-    def run_std_plvl_pipeline(self):
-        """Run StdPressure radiosondes through Level0 → Level1 → Level2."""
+    def run_sif_std_plvl_pipeline(self):
+        """Run SIF StdPressure radiosondes through Level0 → Level1 → Level2."""
 
-        lvl0 = RadiosondesLevel0(
+        lvl0 = SIFRadiosondesLevel0(
             radiosondes=self.collection
         )
         lvl0.build_std_plvl_radiosondes_lvl0()
         lvl0.std_plvl_radiosonde_ds.to_netcdf(
-            utils.FileManagement.NETCDF_DIR / "sif.std_plvl_radiosondes.profiles.level0.nc"
+            fm.NETCDF_DIR / "sif.std_plvl_radiosondes.profiles.level0.nc"
         )
 
-        lvl1 = RadiosondesLevel1(
+        lvl1 = SIFRadiosondesLevel1(
             radiosondes_lvl0=lvl0
         )
         lvl1.build_std_plvl_radiosondes_lvl1()
         lvl1.std_plvl_radiosonde_ds.to_netcdf(
-            utils.FileManagement.NETCDF_DIR / "sif.std_plvl_radiosondes.profiles.level1.nc"
+            fm.NETCDF_DIR / "sif.std_plvl_radiosondes.profiles.level1.nc"
         )
 
-        lvl2 = RadiosondesLevel2(
+        lvl2 = SIFRadiosondesLevel2(
             radiosondes_lvl1=lvl1
         )
         lvl2.build_std_plvl_radiosondes_lvl2()
         lvl2.std_plvl_radiosonde_ds.to_netcdf(
-            utils.FileManagement.NETCDF_DIR / "sif.std_plvl_radiosondes.profiles.level2.nc"
+            fm.NETCDF_DIR / "sif.std_plvl_radiosondes.profiles.level2.nc"
         )
 
         return None
+
+    def run_igra_pipeline(self):
+        """Run IGRA radiosondes through Level0 → Level1"""
+
+        lvl0 = IGRARadiosondesLevel0(
+            filepaths=self.filepaths
+        )
+        lvl0.build_igra_radiosondes_lvl0()
+        lvl0.igra_lvl0_dataset.to_netcdf(
+            fm.NETCDF_DIR / "sif.igra_radiosondes.profiles.level0.nc"
+        )

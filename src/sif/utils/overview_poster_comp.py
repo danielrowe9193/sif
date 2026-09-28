@@ -193,6 +193,11 @@ def main():
 
             metrics = ["R²", "RMSE", "Bias"]
 
+            stats_text_col1 = "Metric  ERA5   IFS    GFS\n" + "\n".join(
+                f"{m:<7}{era5_stats[m]:5.2f}  {ifs_stats[m]:5.2f}  {gfs_stats[m]:5.2f}"
+                for m in metrics
+            )
+
             stats_text = "Metric   IFS    GFS\n" + "\n".join(
                 f"{m:<7}{ifs_stats[m]:5.2f}  {gfs_stats[m]:5.2f}"
                 for m in metrics

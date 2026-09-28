@@ -203,6 +203,14 @@ def main():
                 for m in metrics
             )
 
+            # Use the ERA5/IFS/GFS statistics only in column 1.
+            if col == 0:
+                stats_text = stats_text_col0
+                text_x = 0.35
+
+            else:
+                text_x = 0.5
+
             if row == 0:
                 ax.text(
                     0.50,

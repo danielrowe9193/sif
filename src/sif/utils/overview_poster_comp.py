@@ -126,6 +126,17 @@ def main():
                 label="Fehmarn",
             )
 
+            # ERA5.
+            ax.plot(
+                sounding_nums,
+                era5[index].values,
+                color="black",
+                linewidth=2,
+                marker="o",
+                linestyle=":",
+                label="ERA5",
+            )
+
             # IFS.
             ax.plot(
                 sounding_nums,

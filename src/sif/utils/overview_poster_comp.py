@@ -268,8 +268,8 @@ def main():
     fig.legend(
         handles,
         labels,
-        loc="upper center",
-        ncol=3,
+        loc="lower center",
+        ncol=4,
         fontsize=26,
     )
 

@@ -73,6 +73,10 @@ def main():
         "li": (0, 16),
     }
 
+
+    # Load ERA5.
+    era5 = load_ds('era5.radiosondes.profiles.level1.nc')
+
     # Load the IFS.
     ifs = load_ds('ifs.radiosondes.profiles.level1.nc').sel(station='Fehmarn')
 

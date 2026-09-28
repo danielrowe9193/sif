@@ -6,14 +6,14 @@ import pandas as pd
 import xarray as xr
 
 from src.sif.observations.igra2_requests import igra2_stations_df
-from src.sif.utils.utils import FileManagement
+import src.sif.utils.file_management as FileManagement
 
 
 # Areas for users to edit.
 igra_data_folder = FileManagement.IGRA_DIR.glob("*.txt.zip")
 
 # For soundings in a particular date range.
-start_date: str = "2006-08"
+start_date: str = "2026-08"
 end_date: str = "2026-09"
 
 # For soundings in only this year or these months.
@@ -800,7 +800,6 @@ def derived_soundings_to_xarray(soundings: dict[pd.Timestamp, pd.DataFrame]) -> 
     df = igra2_stations_df()
     attrs_dict = df.loc[df["station_id"] == soundings[times[0]].attrs["station"]].reset_index(drop=True).iloc[0].to_dict()
 
-
     ds = xr.Dataset(
 
         data_vars={
@@ -1462,58 +1461,58 @@ def main():
 if __name__ == "__main__":
     main()
 
-# # File names for the data file and the derived sounding files.
-# data_file = "BBM00078954-data.txt.zip"
-# drvd_file = "BBM00078954-drvd.txt.zip"
-#
-# # Locate the data and the derived sounding files.
-# zip_data_file = FileManagement.IGRA_DIR
-# zip_drvd_file = DATA_DIR / drvd_file
-#
-# # Decode the data and the derived sounding files into a list of lines.
-# data_lines = decode_igra_zipfile(zip_data_file)
-# drvd_lines = decode_igra_zipfile(zip_drvd_file)
-#
-# # Parse the list of data lines into a dictionary of Timestamps and DataFrames.
-# soundings = parse_soundings(data_lines)
-# ds_data = soundings_to_xarray(soundings)
-#
-# # Parse the list of derived lines into a dictionary of Timestamp and DataFrames.
-# derived_soundings = parse_derived_soundings(drvd_lines)
-# ds_drvd = derived_soundings_to_xarray(derived_soundings)
-#
-# # Merge the data and derived datasets.
-# ds = merge_sounding_datasets(ds_data, ds_drvd)
-#
-# # Write the output file to the data directory.
-# output_file = data_file.split('-')[0] + '4.nc'
-# ds.to_netcdf(DATA_DIR / output_file)
-#
-# print(f"Wrote {output_file} to the directory {DATA_DIR.resolve()}.")
+# File names for the data file and the derived sounding files.
+data_file = "BBM00078954-data.txt.zip"
+drvd_file = "BBM00078954-drvd.txt.zip"
 
-# ROOT = Path(__file__).resolve().parents[2]
-# DATA_DIR = Path("data")
-# ZIP_DIR = ROOT / DATA_DIR
-#
-# filename = "BBM00078954-data.txt.zip"
-# zip_file = ZIP_DIR / filename
-#
-#
-# with zipfile.ZipFile(zip_file, mode="r") as zf:
-#     text_files = [file for file in zf.namelist() if file.endswith(".txt")]
-#
-#     if not text_files:
-#         raise RuntimeError(f"No .txt files found in {ZIP_DIR.resolve().name}.")
-#
-#     with zf.open(text_files[0]) as f:
-#         lines = f.read().decode("ascii").splitlines()
-#
-# soundings = parse_soundings(lines)
-#
-# ds = soundings_to_xarray(soundings)
-# print(ds, "\n")
-#
-# output_file = filename.split("-")[0] + ".nc"
-# ds.to_netcdf(ZIP_DIR / output_file)
-#
-# print(f"Wrote {output_file} to the directory {ZIP_DIR.resolve()}.")
+# Locate the data and the derived sounding files.
+zip_data_file = FileManagement.IGRA_DIR
+zip_drvd_file = FileManagement.DATA_DIR / drvd_file
+
+# Decode the data and the derived sounding files into a list of lines.
+data_lines = decode_igra_zipfile(zip_data_file)
+drvd_lines = decode_igra_zipfile(zip_drvd_file)
+
+# Parse the list of data lines into a dictionary of Timestamps and DataFrames.
+soundings = parse_soundings(data_lines)
+ds_data = soundings_to_xarray(soundings)
+
+# Parse the list of derived lines into a dictionary of Timestamp and DataFrames.
+derived_soundings = parse_derived_soundings(drvd_lines)
+ds_drvd = derived_soundings_to_xarray(derived_soundings)
+
+# Merge the data and derived datasets.
+ds = merge_sounding_datasets(ds_data, ds_drvd)
+
+# Write the output file to the data directory.
+output_file = data_file.split('-')[0] + '4.nc'
+ds.to_netcdf(FileManagement.DATA_DIR / output_file)
+
+print(f"Wrote {output_file} to the directory {FileManagement.DATA_DIR.resolve()}.")
+
+ROOT = Path(__file__).resolve().parents[2]
+DATA_DIR = Path("data")
+ZIP_DIR = ROOT / DATA_DIR
+
+filename = "BBM00078954-data.txt.zip"
+zip_file = ZIP_DIR / filename
+
+
+with zipfile.ZipFile(zip_file, mode="r") as zf:
+    text_files = [file for file in zf.namelist() if file.endswith(".txt")]
+
+    if not text_files:
+        raise RuntimeError(f"No .txt files found in {ZIP_DIR.resolve().name}.")
+
+    with zf.open(text_files[0]) as f:
+        lines = f.read().decode("ascii").splitlines()
+
+soundings = parse_soundings(lines)
+
+ds = soundings_to_xarray(soundings)
+print(ds, "\n")
+
+output_file = filename.split("-")[0] + ".nc"
+ds.to_netcdf(ZIP_DIR / output_file)
+
+print(f"Wrote {output_file} to the directory {ZIP_DIR.resolve()}.")

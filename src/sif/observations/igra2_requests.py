@@ -3,8 +3,8 @@ from typing import Optional
 
 import pandas as pd
 import requests
+import src.sif.utils.file_management as fm
 
-from src.sif.utils.utils import FileManagement
 
 
 def igra2_stations_df():
@@ -137,7 +137,7 @@ def download_soundings(station_ids: list[str], derived: Optional[bool] = True) -
 
     base_url = "https://www.ncei.noaa.gov/data/integrated-global-radiosonde-archive/access/"
 
-    FileManagement.IGRA_DIR.mkdir(exist_ok=True, parents=True)
+    fm.IGRA_DIR.mkdir(exist_ok=True, parents=True)
 
     for station_id in station_ids:
 
@@ -159,7 +159,7 @@ def download_soundings(station_ids: list[str], derived: Optional[bool] = True) -
 
             if response.status_code == 200:
 
-                output_file = FileManagement.IGRA_DIR / zip_file
+                output_file = fm.IGRA_DIR / zip_file
 
                 with open(output_file, "wb") as zf:
                     zf.write(response.content)

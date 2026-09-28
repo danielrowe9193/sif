@@ -196,7 +196,7 @@ class GFSLevelZero:
 
     def __init__(self):
         """
-        Initialize an IFSLevelZero instance.
+        Initialize an GFSLevelZero instance.
         """
         self.data_dir = fm.GFS_DIR
 
@@ -245,12 +245,12 @@ class GFSLevelZero:
 
             # Assign forecast-hour coordinate
             gfs_ds = gfs_ds.assign_coords(
-                forecast_hour=("valid_time", ["anal", "12h", "24h", "48h"])
+                forecast_hour=("valid_time", ["anl", "12h", "24h", "48h"])
             )
 
             # Compute initialization time
             init_time = gfs_ds.sel(
-                forecast_hour="anal"
+                forecast_hour="anl"
             ).valid_time.values
 
             gfs_ds = gfs_ds.assign_coords(
@@ -271,7 +271,7 @@ class GFSLevelZero:
 
         return None
 
-    def export_ifs_level_zero_ds(self) -> None:
+    def export_gfs_level_zero_ds(self) -> None:
         """
         Export the Level‑0 dataset to NETCDF.
 
@@ -359,6 +359,191 @@ class GFSLevelOne:
         return None
 
 
+class ICONLevelZero:
+    """
+    Build Level‑0 ICON radiosonde forecast datasets.
+
+    This class collects unprocessed ICON forecast files, loads them into xarray
+    datasets, applies basic preprocessing (sorting, coordinate assignment,
+    renaming), and concatenates them into a single Level‑0 dataset.
+    """
+
+    def __init__(self):
+        """
+        Initialize an ICONLevelZero instance.
+        """
+        self.data_dir = fm.ICON_DIR
+
+        self._icon_path_list = []
+        self._icon_ds_list = []
+
+        self.dataset: None | xr.Dataset = None
+        self.dataset_filepath = (
+                fm.ICON_DIR / "icon.radiosondes.profiles.level0.nc"
+        )
+
+    def collect_fc_file_paths(self) -> None:
+        """
+        Collect file paths for all ICON forecast files.
+
+        The method searches the ICON directory for subdirectories matching
+        `2026-08*` and collects all files beginning with `ALL*`.
+
+        Returns
+        -------
+        None
+        """
+        for icon_dir in self.data_dir.glob("2026-08*"):
+            for fc_data in icon_dir.glob("ALL*"):
+                self._icon_path_list.append(fc_data)
+
+        return None
+
+    def build_icon_level_zero_ds(self) -> None:
+        """
+        Build the Level‑0 ICON dataset.
+
+        This method loads each collected forecast file, sorts by `valid_time`,
+        assigns forecast-hour coordinates (`12h`, `24h`, `48h`), computes the
+        initialization time, renames key variables, and stores each processed
+        dataset. Finally, all datasets are concatenated along the `valid_time`
+        dimension.
+
+        Returns
+        -------
+        None
+        """
+        for fc_data_path in sorted(self._icon_path_list):
+            icon_ds = xr.open_dataset(fc_data_path)
+            icon_ds = icon_ds.sortby("valid_time")
+
+            # Select the synoptic hours of interest. Icon dataset is hourly resolution which is not needed in our analysis.
+            icon_ds = icon_ds.isel(time=[0, 12, 24, 48])
+
+            # Assign forecast-hour coordinate
+            icon_ds = icon_ds.assign_coords(
+                forecast_hour=("time", ["anl", "12h", "24h", "48h"])
+            )
+
+            # Compute initialization time
+            init_time = icon_ds.sel(
+                forecast_hour="anl"
+            ).valid_time.values
+
+            icon_ds = icon_ds.assign_coords(
+                init_time=("time", [init_time, init_time, init_time, init_time])
+            )
+
+            # Icon stores 'rh' and 'td' on dimensions that are irrelevant to our analysis.
+            # These variables are dropped
+            icon_ds = icon_ds.drop_vars(
+                ['rh', 'td', 'valid_time']
+            )
+
+            self._icon_ds_list.append(icon_ds)
+
+        self.dataset = xr.concat(self._icon_ds_list, dim="time", join='outer')
+
+        # Rename variables
+        self.dataset = self.dataset.rename(
+            {
+                "t": "ta",
+                "U": "u",
+                "V": "v",
+                "time": "valid_time",
+            }
+        )
+
+        return None
+
+    def export_icon_level_zero_ds(self) -> None:
+        """
+        Export the Level‑0 dataset to NETCDF.
+
+        Returns
+        -------
+        None
+        """
+        self.dataset.to_netcdf(self.dataset_filepath)
+        return None
+
+
+class ICONLevelOne:
+    """
+    Build Level‑1 IFS radiosonde forecast datasets.
+
+    Level‑1 processing applies derived thermodynamic indices (CAPE, K‑index,
+    TT‑index, Lifted Index) to the Level‑0 dataset and exports the result.
+    """
+
+    def __init__(self, icon_level_zero: ICONLevelZero):
+        """
+        Initialize an ICONLevelOne instance.
+
+        Parameters
+        ----------
+        icon_level_zero : ICONLevelZero
+            A fully initialized Level‑ 0 processor.
+
+        Notes
+        -----
+        The Level‑ 0 dataset is loaded from disk and stored as `self.dataset`.
+        """
+        self.icon_level_zero = icon_level_zero
+
+        self.dataset = xr.open_dataset(self.icon_level_zero.dataset_filepath)
+        self.dataset_filepath = (
+                fm.ICON_DIR / "icon.radiosondes.profiles.level1.nc"
+        )
+
+    def build_icon_level_one_ds(self) -> None:
+        """
+        Compute Level‑1 thermodynamic indices.
+
+        This method applies several derived meteorological indices to the
+        Level‑0 dataset:
+
+        - Dewpoint Temperature
+        - CAPE (Convective Available Potential Energy)
+        - K‑index
+        - TT‑index (Total Totals)
+        - Lifted Index (LI)
+
+        All calculations are delegated to `CalcUtils`.
+
+        Returns
+        -------
+        None
+        """
+        # Force dimensions to be in the required order for calculations.
+        self.dataset = self.dataset.transpose("station", "valid_time", "height", "lev", "height_3")
+
+        self.dataset = calc.calculate_td_from_q(self.dataset)
+        self.dataset = calc.calculate_potential_temperature(self.dataset)
+        self.dataset = calc.calculate_wet_bulb_potential_temperature(self.dataset)
+        self.dataset = calc.calculate_height_from_pressure(self.dataset)
+        self.dataset = calc.calculate_cape_cin(self.dataset)
+        self.dataset = calc.calculate_k_index(self.dataset)
+        self.dataset = calc.calculate_tt_index(self.dataset)
+        self.dataset = calc.calculate_li(self.dataset)
+        # self.dataset = calc.calculate_ji(self.dataset)
+        # self.dataset = calc.calculate_ri(self.dataset)
+        # self.dataset = calc.calculate_pw(self.dataset)
+
+        return None
+
+    def export_gfs_level_one_ds(self) -> None:
+        """
+        Export the Level‑1 dataset to NETCDF.
+
+        Returns
+        -------
+        None
+        """
+        self.dataset.to_netcdf(self.dataset_filepath)
+        return None
+
+
 class ForecastRadiosondePipeline:
     """
     Orchestrates the full workflow for forecast radiosondes:
@@ -386,7 +571,7 @@ class ForecastRadiosondePipeline:
         lvl0 = GFSLevelZero()
         lvl0.collect_fc_file_paths()
         lvl0.build_gfs_level_zero_ds()
-        lvl0.export_ifs_level_zero_ds()
+        lvl0.export_gfs_level_zero_ds()
 
         lvl1 = GFSLevelOne(lvl0)
         lvl1.build_gfs_level_one_ds()
@@ -399,4 +584,15 @@ class ForecastRadiosondePipeline:
         """Run ICON radiosondes through Level 0 -> Level 1."""
 
         ...
+
+        lvl0 = ICONLevelZero()
+        lvl0.collect_fc_file_paths()
+        lvl0.build_icon_level_zero_ds()
+        lvl0.export_icon_level_zero_ds()
+
+        lvl1 = ICONLevelOne(lvl0)
+        lvl1.build_icon_level_one_ds()
+        lvl1.export_gfs_level_one_ds()
+
+        return None
 

@@ -20,6 +20,9 @@ fehmarn = ds.sel(station=station_name, p=slice(None, 70))
 launch_times = fehmarn.launch_time.values
 sounding_nums = fehmarn.sounding_num.values
 
+# Load ERA5.
+era5 = load_ds('era5.radiosondes.profiles.level1.nc')
+
 # Load the IFS.
 ifs_dataset = 'ifs.radiosondes.profiles.level1.nc'
 ifs = load_ds(ifs_dataset).sel(station=station_name)

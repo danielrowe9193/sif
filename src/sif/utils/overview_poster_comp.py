@@ -4,7 +4,7 @@ import matplotlib.dates as mdates
 import matplotlib.pyplot as plt
 import numpy as np
 import xarray as xr
-from sklearn.metrics import mean_squared_error, r2_score
+from sklearn.metrics import r2_score, root_mean_squared_error
 
 from src.sif.utils.file_management import NETCDF_DIR, PLOT_DIR
 
@@ -45,7 +45,7 @@ def calculate_stats(
 
     stats = {
         "R²": r2_score(observation, model),
-        "RMSE": np.sqrt(mean_squared_error(observation, model)),
+        "RMSE": root_mean_squared_error(observation, model),
         "Bias": np.mean(model - observation),
     }
 
@@ -68,7 +68,7 @@ def main():
     # Y-axis limits for each stability index.
     y_limits = {
         "k_index": (-15, 40),
-        "ri": (19, 35),
+        "ri": (16, 33),
         "ji": (None, None),
         "li": (0, 16),
     }
@@ -106,6 +106,7 @@ def main():
         "48 Hour Forecast": (ifs_f48h, gfs_f48h),
     }
 
+
     # Plotting
     fig, axes = plt.subplots(4, 3, figsize=(28, 24), sharex=True)
 
@@ -130,10 +131,9 @@ def main():
             ax.plot(
                 sounding_nums,
                 era5[index].values,
-                color="black",
+                color="gray",
                 linewidth=2,
                 marker="o",
-                linestyle=":",
                 label="ERA5",
             )
 
@@ -180,7 +180,7 @@ def main():
                 fehmarn[index].values,
                 era5[index].values,
             )
-            
+
             ifs_stats = calculate_stats(
                 fehmarn[index].values,
                 ifs_ds[index].values,
@@ -193,7 +193,7 @@ def main():
 
             metrics = ["R²", "RMSE", "Bias"]
 
-            stats_text_col1 = "Metric  ERA5   IFS    GFS\n" + "\n".join(
+            stats_text_col0 = "Metric  ERA5   IFS    GFS\n" + "\n".join(
                 f"{m:<7}{era5_stats[m]:5.2f}  {ifs_stats[m]:5.2f}  {gfs_stats[m]:5.2f}"
                 for m in metrics
             )
@@ -213,7 +213,7 @@ def main():
 
             if row == 0:
                 ax.text(
-                    0.50,
+                    text_x,
                     0.30,
                     stats_text,
                     transform=ax.transAxes,
@@ -229,7 +229,7 @@ def main():
 
             elif row == 1:
                 ax.text(
-                    0.50,
+                    text_x,
                     0.30,
                     stats_text,
                     transform=ax.transAxes,
@@ -245,7 +245,7 @@ def main():
 
             elif row == 3:
                 ax.text(
-                    0.50,
+                    text_x,
                     0.98,
                     stats_text,
                     transform=ax.transAxes,
@@ -273,7 +273,7 @@ def main():
         fontsize=26,
     )
 
-    fig.tight_layout(rect=[0, 0, 1, 0.96])
+    fig.tight_layout(rect=[0, 0.04, 1, 1])
 
     plt.savefig(PLOT_DIR / "stability_index_comparisons.png", dpi=300)
     plt.show()

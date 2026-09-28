@@ -176,6 +176,11 @@ def main():
             ax.tick_params(axis="x", which="major", labelsize=16)
 
             # Compute statistics.
+            era5_stats = calculate_stats(
+                fehmarn[index].values,
+                era5[index].values,
+            )
+            
             ifs_stats = calculate_stats(
                 fehmarn[index].values,
                 ifs_ds[index].values,

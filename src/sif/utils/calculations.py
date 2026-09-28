@@ -136,33 +136,87 @@ def calculate_height_from_geopotential(profile: xr.Dataset | xr.DataTree):
     return profile
 
 
-def calculate_td_from_q(profile: xr.Dataset | xr.DataTree):
+def calculate_height_from_pressure(radiosonde_dataset: xr.Dataset | xr.DataTree, input_core_dims='height', output_core_dims='height'):
+    """
+    Calculate the height from pressure values in dataset.
 
-    p = profile["p"]
-    q = profile["q"]
+    Assumes a standard atmosphere via the mpcalc.pressure_to_height_std() method.
+    This method's prime functionality is for ICON datasets.
+    :param output_core_dims: Core dims on which the calculated heights should be stored on. Default is 'height' for icon datasets.
+    :param input_core_dims: Core dims on which the pressure is on. Default is 'height' for icon datasets.
+    :param radiosonde_dataset: A dataset containing pressure values.
+    :return: A dataset updated with heights.
+    """
 
-    def td(p, q):
-        p = p * units.hPa
-        q = q * units("kg/kg")
+    p = radiosonde_dataset['p']
 
-        td = (mpcalc.dewpoint_from_specific_humidity(p, q)).to(units.kelvin)
+    def calc_height_from_pressure(pressure):
+        press = pressure * units.hPa
+        height = mpcalc.pressure_to_height_std(press)
+        return height.magnitude
 
-        return td.magnitude
-
-    t_d = xr.apply_ufunc(
-        td,
+    height = xr.apply_ufunc(
+        calc_height_from_pressure,
         p,
-        q,
-        input_core_dims=[["p"], ["p"]],
-        output_core_dims=[["p"]],
+        input_core_dims=[[input_core_dims]],
+        output_core_dims=[[output_core_dims]],
         vectorize=True,
         dask="parallelized",
         output_dtypes=[float],
     )
 
-    profile["td"] = t_d
+    radiosonde_dataset["height"] = height
 
-    return profile
+    return radiosonde_dataset
+
+
+def calculate_td_from_q(radiosonde_dataset: xr.Dataset | xr.DataTree) -> xr.Dataset | xr.DataTree:
+    """
+    Calculate the dewpoint temperatures from specific humidity in a radiosonde dataset.
+
+    :param radiosonde_dataset: A dataset containing pressure (labelled 'p') and specific humidity (labelled 'q'), in units hPa and kg/kg respectively.
+    Expects the radiosonde_dataset to have dimensions (station, time/sounding_num, height), where the labels are arbitrary but the ordering of the dimensions is not.
+    :return: A dataset containing dewpoint temperature in kelvin, labelled 'td'
+    """
+
+    radiosonde_dataset = radiosonde_dataset.copy()
+
+    p = (
+            np.broadcast_to(radiosonde_dataset["p"].data, radiosonde_dataset["ta"].shape)
+            * units.hPa
+    )
+    q = radiosonde_dataset["q"].values * units('kg/kg')
+
+    td = mpcalc.dewpoint_from_specific_humidity(pressure=p.T, specific_humidity=q.T).to(units.kelvin)
+
+    # Assumes the dimensions of air temperature (labelled 'ta') in the dataset.
+    radiosonde_dataset['td'] = xr.DataArray(
+        td.magnitude.T,
+        dims=radiosonde_dataset['ta'].dims
+    )
+
+    # def td(p, q):
+    #     p = p * units.hPa
+    #     q = q * units("kg/kg")
+    #
+    #     td = (mpcalc.dewpoint_from_specific_humidity(p, q)).to(units.kelvin)
+    #
+    #     return td.magnitude
+    #
+    # t_d = xr.apply_ufunc(
+    #     td,
+    #     p,
+    #     q,
+    #     input_core_dims=[["p"], ["p"]],
+    #     output_core_dims=[["p"]],
+    #     vectorize=True,
+    #     dask="parallelized",
+    #     output_dtypes=[float],
+    # )
+    #
+    # radiosonde_dataset["td"] = t_d
+
+    return radiosonde_dataset
 
 
 def calculate_td_from_rh(radiosonde_dataset: xr.Dataset | xr.DataTree) -> xr.Dataset:

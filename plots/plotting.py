@@ -490,4 +490,6 @@ def plot_cross_section(ds, time, station_order=None, title=None):
     add_legend(ax)
 
     plt.tight_layout()
-    plt.show()
+    # plt.show()
+
+    return plt.gcf()

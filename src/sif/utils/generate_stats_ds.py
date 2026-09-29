@@ -297,9 +297,9 @@ stats_ds = xr.Dataset(
             f"{ifs_dataset}; "
             f"{gfs_dataset}"
         ),
-        "models": "GFS; IFS",
-        "forecast_hours": "12h; 24h; 48h",
-        "statistics": "R2; RMSE; bias; MAE; sample size",
+        "models": "ERA5; GFS; IFS",
+        "lead_times": "00h; 12h; 24h; 48h",
+        "statistics": "R²; RMSE; bias; MAE; sample size",
         "temperature_variable": "ta",
         "dewpoint_variable": "td",
         "date_start": pd.to_datetime(launch_times.min()).strftime("%B %d, %Y %H:%M"),

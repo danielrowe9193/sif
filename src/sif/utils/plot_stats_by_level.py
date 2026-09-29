@@ -24,9 +24,9 @@ ta_statistics = [
 
 # Create figure.
 fig, axes = plt.subplots(
-    nrows=len(ta_statistics),
-    ncols=len(forecast_hours),
-    figsize=(20, 28),
+    nrows=len(statistics),
+    ncols=len(lead_times),
+    figsize=(24, 28),
     sharey=True,
 )
 

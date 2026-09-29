@@ -49,8 +49,8 @@ for ds in [era5, ifs_f12h, ifs_f24h, ifs_f48h, gfs_f12h, gfs_f24h, gfs_f48h]:
 
 
 # Model and forecast datasets.
-models = ["GFS", "IFS"]
-forecast_hours = ["12h", "24h", "48h"]
+models = ["ERA5", "GFS", "IFS"]
+lead_times = ["00h", "12h", "24h", "48h"]
 
 forecast_datasets = {
     "GFS": {

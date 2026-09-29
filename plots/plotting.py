@@ -58,38 +58,84 @@ def select_stations(ds, station_order=None):
     return stations, station_indices
 
 
+# def get_cross_section_data(ds, time_index, station_indices):
+#     """Find and calculate meteorological cross-section variables."""
+#     pressure = np.asarray(
+#         ds["p"].values,
+#         dtype=float
+#     )
+
+#     ta = ds["ta"].values[
+#         time_index,
+#         station_indices,
+#         :
+#     ]
+
+#     q = ds["q"].values[
+#         time_index,
+#         station_indices,
+#         :
+#     ]
+
+#     u = ds["u"].values[
+#         time_index,
+#         station_indices,
+#         :
+#     ]
+
+#     v = ds["v"].values[
+#         time_index,
+#         station_indices,
+#         :
+#     ]
+
+#     temperature = ta - 273.15 # change to celcius
+
+#     dewpoint = dewpoint_from_specific_humidity(
+#         pressure[None, :] * units.hPa,
+#         ta * units.kelvin,
+#         q * units("kg/kg")
+#     )
+
+#     dewpoint = dewpoint.to("degC").magnitude
+
+#     return {
+#         "pressure": pressure,
+#         "temperature": temperature,
+#         "dewpoint": dewpoint,
+#         "u": u,
+#         "v": v,
+#     }
+
 def get_cross_section_data(ds, time_index, station_indices):
-    """Find and calculate meteorological cross-section variables."""
+    """Extract and calculate meteorological cross-section variables."""
+
     pressure = np.asarray(
         ds["p"].values,
         dtype=float
     )
 
-    ta = ds["ta"].values[
-        time_index,
-        station_indices,
-        :
-    ]
+    ta = ds["ta"].isel(
+        valid_time=time_index,
+        station=station_indices
+    ).values
 
-    q = ds["q"].values[
-        time_index,
-        station_indices,
-        :
-    ]
+    q = ds["q"].isel(
+        valid_time=time_index,
+        station=station_indices
+    ).values
 
-    u = ds["u"].values[
-        time_index,
-        station_indices,
-        :
-    ]
+    u = ds["u"].isel(
+        valid_time=time_index,
+        station=station_indices
+    ).values
 
-    v = ds["v"].values[
-        time_index,
-        station_indices,
-        :
-    ]
+    v = ds["v"].isel(
+        valid_time=time_index,
+        station=station_indices
+    ).values
 
-    temperature = ta - 273.15 # change to celcius
+    temperature = ta - 273.15
 
     dewpoint = dewpoint_from_specific_humidity(
         pressure[None, :] * units.hPa,
@@ -106,6 +152,7 @@ def get_cross_section_data(ds, time_index, station_indices):
         "u": u,
         "v": v,
     }
+
 
 
 def interpolate_cross_section(values,x_station,x,):
@@ -395,7 +442,7 @@ def add_legend(ax):
     )
 
 
-def plot_cross_section(ds, time, station_order=None):
+def plot_cross_section(ds, time, station_order=None, title=None):
     """
     Plot atmospheric cross section
 
@@ -429,7 +476,7 @@ def plot_cross_section(ds, time, station_order=None):
     )
 
     ax.set_title(
-        "Atmospheric Cross Section\n"
+        f"{title} Atmospheric Cross Section\n"
         f"Valid: {selected_time}"
     )
 

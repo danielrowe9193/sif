@@ -53,6 +53,9 @@ models = ["ERA5", "GFS", "IFS"]
 lead_times = ["00h", "12h", "24h", "48h"]
 
 forecast_datasets = {
+    "ERA5": {
+        "00h": era5,
+    },
     "GFS": {
         "12h": gfs_f12h,
         "24h": gfs_f24h,

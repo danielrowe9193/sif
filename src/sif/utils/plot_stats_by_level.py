@@ -12,7 +12,7 @@ from src.sif.utils.file_management import NETCDF_DIR
 ds = load_ds("fehmarn.per_level_stats.nc")
 
 # Forecast hours.
-forecast_hours = ["12h", "24h", "48h"]
+lead_times = ["12h", "24h", "48h"]
 
 # Statistics to plot.
 ta_statistics = [

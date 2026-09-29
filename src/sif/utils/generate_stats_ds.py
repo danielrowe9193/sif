@@ -20,8 +20,10 @@ fehmarn = ds.sel(station=station_name, p=slice(None, 70))
 launch_times = fehmarn.launch_time.values
 sounding_nums = fehmarn.sounding_num.values
 
+
 # Load ERA5.
 era5 = load_ds('era5.radiosondes.profiles.level1.nc')
+
 
 # Load the IFS.
 ifs_dataset = 'ifs.radiosondes.profiles.level1.nc'
@@ -72,7 +74,7 @@ forecast_datasets = {
 # Initialize empty arrays.
 shape = (
     len(models),
-    len(forecast_hours),
+    len(lead_times),
     len(common_p),
 )
 
@@ -93,7 +95,12 @@ n_td = np.zeros(shape, dtype=int)
 # Calculate statistics.
 for i, model_name in enumerate(models):
 
-    for j, forecast_hour in enumerate(forecast_hours):
+    for j, forecast_hour in enumerate(lead_times):
+
+        # ERA5 only has a 00h entry.
+        # GFS and IFS have 12h, 24h, and 48h entries.
+        if forecast_hour not in forecast_datasets[model_name]:
+            continue
 
         model_ds = forecast_datasets[model_name][forecast_hour]
 
@@ -138,7 +145,7 @@ for i, model_name in enumerate(models):
 stats_ds = xr.Dataset(
     {
         "ta_r2": (
-            ("model", "forecast_hour", "p"),
+            ("model", "lead_time", "p"),
             ta_r2,
             {
                 "long_name": "Temperature coefficient of determination",
@@ -150,7 +157,7 @@ stats_ds = xr.Dataset(
             },
         ),
         "ta_rmse": (
-            ("model", "forecast_hour", "p"),
+            ("model", "lead_time", "p"),
             ta_rmse,
             {
                 "long_name": "Temperature root mean square error",
@@ -162,7 +169,7 @@ stats_ds = xr.Dataset(
             },
         ),
         "ta_bias": (
-            ("model", "forecast_hour", "p"),
+            ("model", "lead_time", "p"),
             ta_bias,
             {
                 "long_name": "Temperature bias",
@@ -173,7 +180,7 @@ stats_ds = xr.Dataset(
             },
         ),
         "ta_mae": (
-            ("model", "forecast_hour", "p"),
+            ("model", "lead_time", "p"),
             ta_mae,
             {
                 "long_name": "Temperature mean absolute error",
@@ -185,7 +192,7 @@ stats_ds = xr.Dataset(
             },
         ),
         "td_r2": (
-            ("model", "forecast_hour", "p"),
+            ("model", "lead_time", "p"),
             td_r2,
             {
                 "long_name": "Dewpoint coefficient of determination",
@@ -197,7 +204,7 @@ stats_ds = xr.Dataset(
             },
         ),
         "td_rmse": (
-            ("model", "forecast_hour", "p"),
+            ("model", "lead_time", "p"),
             td_rmse,
             {
                 "long_name": "Dewpoint root mean square error",
@@ -209,7 +216,7 @@ stats_ds = xr.Dataset(
             },
         ),
         "td_bias": (
-            ("model", "forecast_hour", "p"),
+            ("model", "lead_time", "p"),
             td_bias,
             {
                 "long_name": "Dewpoint bias",
@@ -220,7 +227,7 @@ stats_ds = xr.Dataset(
             },
         ),
         "td_mae": (
-            ("model", "forecast_hour", "p"),
+            ("model", "lead_time", "p"),
             td_mae,
             {
                 "long_name": "Dewpoint mean absolute error",
@@ -232,7 +239,7 @@ stats_ds = xr.Dataset(
             },
         ),
         "n_ta": (
-            ("model", "forecast_hour", "p"),
+            ("model", "lead_time", "p"),
             n_ta,
             {
                 "long_name": "Number of valid temperature pairs",
@@ -244,7 +251,7 @@ stats_ds = xr.Dataset(
             },
         ),
         "n_td": (
-            ("model", "forecast_hour", "p"),
+            ("model", "lead_time", "p"),
             n_td,
             {
                 "long_name": "Number of valid dewpoint pairs",
@@ -264,9 +271,9 @@ stats_ds = xr.Dataset(
                 "long_name": "Numerical weather prediction model",
             },
         ),
-        "forecast_hour": (
-            "forecast_hour",
-            forecast_hours,
+        "lead_time": (
+            "lead_time",
+            lead_times,
             {
                 "long_name": "Forecast lead time",
             },
@@ -294,6 +301,7 @@ stats_ds = xr.Dataset(
             f"{ref_dataset}"
         ),
         "model_datasets": (
+            "era5.radiosondes.profiles.level1.nc; "
             f"{ifs_dataset}; "
             f"{gfs_dataset}"
         ),

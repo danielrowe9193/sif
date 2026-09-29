@@ -284,9 +284,10 @@ stats_ds = xr.Dataset(
     attrs={
         "title": f"{station_name} Radiosonde Model Verification Statistics",
         "description": (
-            "Statistical comparison of IFS and GFS model temperature "
-            f"and dewpoint against {station_name} radiosonde observations "
-            "for 12-hour, 24-hour, and 48-hour forecasts."
+            "Statistical comparison of ERA5, IFS, and GFS model temperature "
+            f"and dewpoint against {station_name} radiosonde observations. ERA5 is "
+            "ncluded at 00h, while IFS and GFS are included at 12h, 24h, "
+            "and 48h forecast lead times."
         ),
         "station": f'{station_name}',
         "reference_dataset": (

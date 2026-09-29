@@ -112,7 +112,13 @@ for row, (_, statistic_name) in enumerate(ta_statistics):
 
 axes[0, -1].legend(loc="best")
 
-fig.suptitle("Fehmarn Radiosonde Model Verification - Temperature", fontsize=30)
+fig.legend(
+    handles,
+    labels,
+    loc="lower center",
+    ncol=4,
+    fontsize=26,
+)
 
 fig.tight_layout(rect=[0, 0, 1, 0.97])
 

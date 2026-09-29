@@ -44,7 +44,7 @@ gfs_f48h = mod_fxxh(gfs, "48h", launch_times)
 # Common pressure levels.
 common_p = fehmarn.p.values
 
-for ds in [ifs_f12h, ifs_f24h, ifs_f48h, gfs_f12h, gfs_f24h, gfs_f48h]:
+for ds in [era5, ifs_f12h, ifs_f24h, ifs_f48h, gfs_f12h, gfs_f24h, gfs_f48h]:
     common_p = np.intersect1d(common_p, ds.p.values)
 
 

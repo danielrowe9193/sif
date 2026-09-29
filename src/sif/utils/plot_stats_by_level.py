@@ -14,11 +14,12 @@ ds = load_ds("fehmarn.per_level_stats.nc")
 # Forecast hours.
 lead_times = ["12h", "24h", "48h"]
 
+
 # Statistics to plot.
-ta_statistics = [
+statistics = [
     ("ta_r2", "R²"),
-    ("ta_rmse", "RMSE / K"),
-    ("ta_bias", "Bias / K"),
+    ("ta_rmse", "RMSE (K)"),
+    ("ta_bias", "Bias (K)"),
 ]
 
 
@@ -36,15 +37,30 @@ pressure_levels = ds.p.values
 # Equal-spaced positions for each pressure level.
 pressure_positions = np.arange(len(pressure_levels))
 
-# Plot.
-for row, (variable, statistic_name) in enumerate(ta_statistics):
 
-    for col, forecast_hour in enumerate(forecast_hours):
+# Plotting.
+
+for row, (variable, statistic_name) in enumerate(statistics):
+
+    for col, lead_time in enumerate(lead_times):
 
         ax = axes[row, col]
 
+        # ERA5.
+        if col == 0:
+
+            era5 = ds[variable].sel(model="ERA5", lead_time="00h")
+
+            ax.plot(
+                era5,
+                pressure_positions,
+                marker="s",
+                linestyle="--",
+                label="ERA5 (00h)",
+            )
+
         # GFS.
-        gfs = ds[variable].sel(model="GFS", forecast_hour=forecast_hour,)
+        gfs = ds[variable].sel(model="GFS", lead_time=lead_time)
 
         ax.plot(
             gfs,
@@ -53,51 +69,63 @@ for row, (variable, statistic_name) in enumerate(ta_statistics):
             label="GFS",
         )
 
-        # IFS.
-        ifs = ds[variable].sel(model="IFS", forecast_hour=forecast_hour, )
+        # IFS
+        ifs = ds[variable].sel(model="IFS", lead_time=lead_time)
 
         ax.plot(
             ifs,
             pressure_positions,
             marker="o",
-            label="GFS",
+            label="IFS",
         )
 
-        # Formatting
         ax.set_ylim(len(pressure_levels) - 1, 0)
 
         ax.set_yticks(pressure_positions)
         ax.set_yticklabels([f"{int(p)}" for p in pressure_levels])
+        ax.tick_params(axis="y", which="major", labelsize=18)
+        ax.tick_params(axis="x", which="major", labelsize=18)
 
         ax.grid(
             which="major",
             linestyle="--",
-            alpha=0.5,
+            alpha=0.3,
         )
 
         # Column titles.
         if row == 0:
-            ax.set_title(f"{forecast_hour} Forecast", fontsize=24, fontweight="bold")
+
+            if col == 0:
+                ax.set_title("ERA5 00h / GFS & IFS 12h", fontsize=26, fontweight='medium')
+
+            else:
+                ax.set_title(f"{lead_time} Forecast",fontsize=26, fontweight='medium')
 
         # X-axis label.
-        ax.set_xlabel(statistic_name)
+        ax.set_xlabel(statistic_name, fontsize=24)
 
         # Y-axis label only on first column.
         if col == 0:
-            ax.set_ylabel("Pressure (hPa)", fontsize=24)
+            ax.set_ylabel("Pressure / hPa", fontsize=24)
 
         # Set x-limits.
+
+        # R².
         if row == 0:
-            ax.set_xlim(0, 1)
+            ax.set_xlim(0.5, 1)
 
-        elif row == 1:
-            ax.set_xlim(0, 2.5)
+        # RMSE.
+        if row == 1:
+            ax.set_xlim(0, 1.8)
 
-        elif row == 2:
+        # Mean Bias.
+        if row == 2:
             ax.set_xlim(-1, 1)
 
+
 # Row labels
-for row, (_, statistic_name) in enumerate(ta_statistics):
+
+for row, (_, statistic_name) in enumerate(statistics):
 
     axes[row, 0].text(
         -0.28,
@@ -110,7 +138,9 @@ for row, (_, statistic_name) in enumerate(ta_statistics):
         fontsize=24,
     )
 
-axes[0, -1].legend(loc="best")
+
+# Add one legend to the figure.
+handles, labels = axes[0, 0].get_legend_handles_labels()
 
 fig.legend(
     handles,
@@ -120,6 +150,8 @@ fig.legend(
     fontsize=26,
 )
 
-fig.tight_layout(rect=[0, 0, 1, 0.97])
+fig.suptitle("Fehmarn Radiosonde Model Verification - Temperature", fontsize=32, fontweight='bold')
+
+fig.tight_layout(rect=[0, 0.04, 1, 0.97])
 
 plt.show()

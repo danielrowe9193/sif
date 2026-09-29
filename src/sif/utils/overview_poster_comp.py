@@ -243,6 +243,22 @@ def main():
                     ),
                 )
 
+            elif row == 2:
+                ax.text(
+                    text_x,
+                    0.30,
+                    stats_text,
+                    transform=ax.transAxes,
+                    verticalalignment="top",
+                    fontsize=22,
+                    fontfamily='monospace',
+                    bbox=dict(
+                        boxstyle="round",
+                        facecolor="white",
+                        alpha=0.8,
+                    ),
+                )
+
             elif row == 3:
                 ax.text(
                     text_x,

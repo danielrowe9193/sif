@@ -149,7 +149,7 @@ def main():
     icon_f12h = icon_fxxh(icon, "12h", launch_times)
     icon_f24h = icon_fxxh(icon, "24h", launch_times)
     icon_f48h = icon_fxxh(icon, "48h", launch_times)
-    
+
 
     # Stability indices to plot.
     indices = [
@@ -173,7 +173,7 @@ def main():
     # Plot each stability index.
     for row, index in enumerate(indices):
 
-        for col, (forecast_hour, (ifs_ds, gfs_ds)) in enumerate(forecast_datasets.items()):
+        for col, (forecast_hour, (ifs_ds, gfs_ds, icon_ds)) in enumerate(forecast_datasets.items()):
 
             ax = axes[row, col]
 
@@ -223,7 +223,7 @@ def main():
                 marker="o",
                 label="ICON",
             )
-            
+
 
             # Column title.
             if row == 0:
@@ -268,28 +268,28 @@ def main():
 
             metrics = ["R²", "RMSE", "Bias"]
 
-            stats_text_col0 = "Metric  ERA5   IFS    GFS\n" + "\n".join(
-                f"{m:<7}{era5_stats[m]:5.2f}  {ifs_stats[m]:5.2f}  {gfs_stats[m]:5.2f}"
+            stats_text_col0 = "Metric  ERA5   IFS   GFS  ICON\n" + "\n".join(
+                f"{m:<7}{era5_stats[m]:5.2f} {ifs_stats[m]:5.2f}  {gfs_stats[m]:4.2f} {icon_stats[m]:5.2f}"
                 for m in metrics
             )
 
-            stats_text = "Metric   IFS    GFS\n" + "\n".join(
-                f"{m:<7}{ifs_stats[m]:5.2f}  {gfs_stats[m]:5.2f}"
+            stats_text = "Metric   IFS   GFS  ICON\n" + "\n".join(
+                f"{m:<7}{ifs_stats[m]:5.2f}  {gfs_stats[m]:4.2f} {icon_stats[m]:5.2f}"
                 for m in metrics
             )
 
-            # Use the ERA5/IFS/GFS statistics only in column 1.
+            # Use the ERA5/IFS/GFS/ICON statistics only in column 1.
             if col == 0:
                 stats_text = stats_text_col0
-                text_x = 0.35
+                text_x = 0.22
 
             else:
-                text_x = 0.5
+                text_x = 0.36
 
             if row == 0:
                 ax.text(
                     text_x,
-                    0.30,
+                    0.31,
                     stats_text,
                     transform=ax.transAxes,
                     verticalalignment="top",
@@ -305,7 +305,7 @@ def main():
             elif row == 1:
                 ax.text(
                     text_x,
-                    0.30,
+                    0.31,
                     stats_text,
                     transform=ax.transAxes,
                     verticalalignment="top",
@@ -321,7 +321,7 @@ def main():
             elif row == 2:
                 ax.text(
                     text_x,
-                    0.30,
+                    0.31,
                     stats_text,
                     transform=ax.transAxes,
                     verticalalignment="top",
@@ -337,7 +337,7 @@ def main():
             elif row == 3:
                 ax.text(
                     text_x,
-                    0.98,
+                    0.96,
                     stats_text,
                     transform=ax.transAxes,
                     verticalalignment="top",
@@ -360,7 +360,7 @@ def main():
         handles,
         labels,
         loc="lower center",
-        ncol=4,
+        ncol=5,
         fontsize=26,
     )
 

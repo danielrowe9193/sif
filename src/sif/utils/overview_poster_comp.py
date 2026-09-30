@@ -261,6 +261,11 @@ def main():
                 gfs_ds[index].values,
             )
 
+            icon_stats = calculate_stats(
+                fehmarn[index].values,
+                icon_ds[index].values,
+            )
+
             metrics = ["R²", "RMSE", "Bias"]
 
             stats_text_col0 = "Metric  ERA5   IFS    GFS\n" + "\n".join(

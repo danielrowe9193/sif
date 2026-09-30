@@ -10,14 +10,9 @@ from matplotlib.lines import Line2D
 def parse_time(time):
     """
     Convert YYYY-MM-DD-HHz to numpy.datetime64.
-
-    Example
-    -------
-    "2029-09-29-00z"
     """
 
     time_clean = str(time).lower().replace("z", "")
-
     date_part, hour_part = time_clean.rsplit("-", 1)
 
     return np.datetime64(
@@ -28,17 +23,11 @@ def parse_time(time):
 def format_time(time):
     """
     Format datetime as YYYY-MM-DD-HHz.
-
-    Example
-    -------
-    2029-09-29T00:00:00
-    ->
-    2029-09-29-00z
     """
 
     time_string = str(time)
 
-    # Remove fractional seconds
+    # remove other decimals
     if "." in time_string:
         time_string = time_string.split(".")[0]
 
@@ -53,20 +42,9 @@ def normalize_forecast_hour(forecast_hour):
     """
     Normalize forecast-hour input.
 
-    Examples
-    --------
-    12
-    "12"
-    "12h"
-
-    All become:
-
-    "12h"
     """
 
-    forecast_hour = str(
-        forecast_hour
-    ).lower().strip()
+    forecast_hour = str(forecast_hour).lower().strip()
 
     if forecast_hour.endswith("h"):
         return forecast_hour
@@ -74,18 +52,9 @@ def normalize_forecast_hour(forecast_hour):
     return f"{forecast_hour}h"
 
 
-# ============================================================
-# TIME / FORECAST SELECTION
-# ============================================================
-
-def select_time(
-    ds,
-    time,
-    forecast_hour
-):
+def select_time(ds, time,forecast_hour):
     """
-    Select the record matching the requested valid time
-    and forecast hour.
+    Match the requested valid timeand forecast hour.
 
     The selection is performed using:
 
@@ -96,65 +65,26 @@ def select_time(
     The corresponding init_time is returned as well.
     """
 
-    target_time = parse_time(
-        time
-    )
+    target_time = parse_time(time)
 
-    requested_forecast_hour = (
-        normalize_forecast_hour(
-            forecast_hour
-        )
-    )
+    requested_forecast_hour = (normalize_forecast_hour(forecast_hour))
 
-    # --------------------------------------------------------
-    # Dataset coordinates
-    # --------------------------------------------------------
+    # coordinates
+    valid_times = np.asarray(ds["valid_time"].values)
+    forecast_hours = np.asarray(ds["forecast_hour"].values).astype(str)
+    init_times = np.asarray(ds["init_time"].values)
 
-    valid_times = np.asarray(
-        ds["valid_time"].values
-    )
-
-    forecast_hours = np.asarray(
-        ds["forecast_hour"].values
-    ).astype(str)
-
-    init_times = np.asarray(
-        ds["init_time"].values
-    )
-
-    # --------------------------------------------------------
-    # Normalize forecast-hour strings
-    # --------------------------------------------------------
-
-    forecast_hours = np.array([
-        normalize_forecast_hour(fh)
-        for fh in forecast_hours
-    ])
-
-    # --------------------------------------------------------
-    # Find records matching forecast hour
-    # --------------------------------------------------------
-
-    forecast_mask = (
-        forecast_hours ==
-        requested_forecast_hour
-    )
-
-    matching_indices = np.where(
-        forecast_mask
-    )[0]
+    # fix forecast strings format
+    forecast_hours = np.array([normalize_forecast_hour(fh) for fh in forecast_hours])
+    forecast_mask = (forecast_hours == requested_forecast_hour)
+    matching_indices = np.where(forecast_mask)[0]
 
     if len(matching_indices) == 0:
-
         raise ValueError(
             f"No records found for "
             f"forecast hour "
             f"{requested_forecast_hour}."
         )
-
-    # --------------------------------------------------------
-    # Find closest valid time among those records
-    # --------------------------------------------------------
 
     time_difference = np.abs(
         valid_times[matching_indices]
@@ -170,27 +100,10 @@ def select_time(
         local_index
     ]
 
-    # --------------------------------------------------------
-    # Selected values
-    # --------------------------------------------------------
+    selected_time = (valid_times[time_index])
+    selected_init_time = (init_times[time_index])
+    selected_forecast_hour = (forecast_hours[time_index])
 
-    selected_time = (
-        valid_times[time_index]
-    )
-
-    selected_init_time = (
-        init_times[time_index]
-    )
-
-    selected_forecast_hour = (
-        forecast_hours[time_index]
-    )
-
-    # --------------------------------------------------------
-    # Print selection
-    # --------------------------------------------------------
-
-    print()
     print("=" * 80)
     print("TIME SELECTION")
     print("=" * 80)
@@ -225,10 +138,7 @@ def select_time(
         f"{time_index}"
     )
 
-    # --------------------------------------------------------
-    # Verify init + forecast = valid
-    # --------------------------------------------------------
-
+    # verify
     forecast_hours_number = int(
         selected_forecast_hour.replace(
             "h",
@@ -278,31 +188,19 @@ def select_time(
     )
 
 
-# ============================================================
-# STATION SELECTION
-# ============================================================
-
-def select_stations(
-    ds,
-    station_order=None
-):
+# stations
+def select_stations(ds, station_order=None):
     """Select station names and their indices."""
 
     dataset_stations = np.asarray(
         ds["station"].values
     ).astype(str)
 
+    # default
     if station_order is None:
-
-        stations = (
-            dataset_stations.copy()
-        )
-
+        stations = (dataset_stations.copy())
     else:
-
-        stations = np.asarray(
-            station_order
-        ).astype(str)
+        stations = np.asarray(station_order).astype(str)
 
         missing = [
             station
@@ -311,7 +209,6 @@ def select_stations(
         ]
 
         if missing:
-
             raise ValueError(
                 f"Stations not present "
                 f"in Dataset: {missing}"
@@ -339,21 +236,12 @@ def select_stations(
     )
 
 
-# ============================================================
-# DATA EXTRACTION
-# ============================================================
-
-def get_cross_section_data(
-    ds,
-    time_index,
-    station_indices
-):
+def get_cross_section_data(ds, time_index, station_indices):
     """
     Extract and calculate meteorological cross-section variables.
-
     Handles two dataset structures:
 
-    DS1 / DS2
+    IFS/GFS
     ----------
     p:
         (p,)
@@ -361,7 +249,7 @@ def get_cross_section_data(
     meteorological variables:
         (station, valid_time, p)
 
-    DS3
+    ICON
     ----------
     p:
         (station, valid_time, height)
@@ -370,127 +258,70 @@ def get_cross_section_data(
         (station, valid_time, height)
     """
 
-    # =========================================================
-    # Determine vertical dimension
-    # =========================================================
-
+    # find vertical dimension
     if "height" in ds["ta"].dims:
-
         vertical_dim = "height"
-
     elif "p" in ds["ta"].dims:
-
         vertical_dim = "p"
-
     else:
-
         raise ValueError(
             "Could not determine vertical dimension "
             "from temperature variable."
         )
 
-    # =========================================================
-    # PRESSURE
-    # =========================================================
-
+    # pressure
     if vertical_dim == "p":
-
-        # -----------------------------------------------------
-        # DS1 / DS2
-        #
-        # Pressure is a common 1-D coordinate.
-        #
-        # p.shape = (levels,)
-        # -----------------------------------------------------
-
         pressure = np.asarray(
             ds["p"].values,
             dtype=float
         )
-
     else:
-
-        # -----------------------------------------------------
-        # DS3
-        #
-        # Pressure varies by station and valid time.
-        #
-        # p.shape =
-        # (station, valid_time, height)
-        #
-        # Select the requested time and stations.
-        # -----------------------------------------------------
-
         pressure = ds["p"].isel(
             valid_time=time_index,
             station=station_indices
         ).values
-
         pressure = np.asarray(
             pressure,
             dtype=float
         )
 
-    # =========================================================
-    # TEMPERATURE
-    # =========================================================
-
+    # temperature
     ta = ds["ta"].isel(
         valid_time=time_index,
         station=station_indices
     ).values
-
     ta = np.asarray(
         ta,
         dtype=float
     )
-
-    # =========================================================
-    # SPECIFIC HUMIDITY
-    # =========================================================
-
+    # specific humidity
     q = ds["q"].isel(
         valid_time=time_index,
         station=station_indices
     ).values
-
     q = np.asarray(
         q,
         dtype=float
     )
-
-    # =========================================================
-    # U WIND
-    # =========================================================
-
+    # wind (u)
     u = ds["u"].isel(
         valid_time=time_index,
         station=station_indices
     ).values
-
     u = np.asarray(
         u,
         dtype=float
     )
-
-    # =========================================================
-    # V WIND
-    # =========================================================
-
+    # wind (v)
     v = ds["v"].isel(
         valid_time=time_index,
         station=station_indices
     ).values
-
     v = np.asarray(
         v,
         dtype=float
     )
-
-    # =========================================================
-    # Print diagnostic shapes
-    # =========================================================
-
+    # print to check
     print()
     print("CROSS-SECTION DATA SHAPES")
     print("-" * 70)
@@ -525,22 +356,7 @@ def get_cross_section_data(
         v.shape
     )
 
-    # =========================================================
-    # Handle pressure shape
-    # =========================================================
-
     if vertical_dim == "p":
-
-        # -----------------------------------------------------
-        # DS1 / DS2
-        #
-        # pressure:
-        #     (levels,)
-        #
-        # meteorological fields:
-        #     (station, levels)
-        # -----------------------------------------------------
-
         if pressure.ndim != 1:
 
             raise ValueError(
@@ -560,29 +376,15 @@ def get_cross_section_data(
                 f"Pressure: {pressure.shape}"
             )
 
-        # -----------------------------------------------------
-        # Pressure for dewpoint needs to be broadcast across
-        # stations.
-        # -----------------------------------------------------
-
+        # Pressure for dewpoint needs to be broadcast across stations
         pressure_for_calculation = (
             pressure[None, :]
         )
 
     else:
 
-        # -----------------------------------------------------
-        # DS3
-        #
-        # pressure:
-        #     (station, height)
-        #
-        # fields:
-        #     (station, height)
-        # -----------------------------------------------------
-
+        # icon data handling
         if pressure.ndim != 2:
-
             raise ValueError(
                 "For height-based datasets, pressure "
                 "must be 2-dimensional. "
@@ -602,10 +404,7 @@ def get_cross_section_data(
             pressure
         )
 
-    # =========================================================
-    # Check all meteorological variables
-    # =========================================================
-
+    # checking shapes
     if ta.shape != q.shape:
 
         raise ValueError(
@@ -630,36 +429,19 @@ def get_cross_section_data(
             f"v={v.shape}"
         )
 
-    # =========================================================
-    # TEMPERATURE
-    # =========================================================
-
-    temperature = (
-        ta - 273.15
-    )
-
-    # =========================================================
-    # DEWPOINT
-    # =========================================================
+     # Celsius
+    temperature = (ta - 273.15)
 
     dewpoint = (
         dewpoint_from_specific_humidity(
             pressure_for_calculation
             * units.hPa,
-
             ta * units.kelvin,
-
             q * units("kg/kg")
         )
     )
 
-    dewpoint = dewpoint.to(
-        "degC"
-    ).magnitude
-
-    # =========================================================
-    # RETURN
-    # =========================================================
+    dewpoint = dewpoint.to("degC").magnitude
 
     return {
         "pressure": pressure,
@@ -674,24 +456,11 @@ def get_cross_section_data(
     }
 
 
-
-# ============================================================
-# INTERPOLATION
-# ============================================================
-
-def interpolate_cross_section(
-    values,
-    x_station,
-    x
-):
+# interpolating
+def interpolate_cross_section(values,x_station,x):
     """Interpolate station data onto a regular x grid."""
 
-    interpolated = np.empty(
-        (
-            len(x),
-            values.shape[1]
-        )
-    )
+    interpolated = np.empty((len(x),values.shape[1]))
 
     for j in range(
         values.shape[1]
@@ -708,25 +477,12 @@ def interpolate_cross_section(
     return interpolated
 
 
-def prepare_interpolated_data(
-    data,
-    nstation
-):
+def prepare_interpolated_data(data,nstation):
     """
     Create x coordinates and interpolate cross-section fields.
 
-    Pressure can be either:
-
-        (height,)
-
-    or:
-
-        (station, height)
+    Pressure can be either (height,) or(station, height)
     """
-
-    # --------------------------------------------------------
-    # Station coordinates
-    # --------------------------------------------------------
 
     x_station = np.arange(
         nstation,
@@ -736,15 +492,7 @@ def prepare_interpolated_data(
     x_min = -0.5
     x_max = nstation - 0.5
 
-    x = np.linspace(
-        x_min,
-        x_max,
-        400
-    )
-
-    # --------------------------------------------------------
-    # Temperature
-    # --------------------------------------------------------
+    x = np.linspace(x_min, x_max, 400)
 
     temperature_x = (
         interpolate_cross_section(
@@ -754,10 +502,6 @@ def prepare_interpolated_data(
         )
     )
 
-    # --------------------------------------------------------
-    # Dewpoint
-    # --------------------------------------------------------
-
     dewpoint_x = (
         interpolate_cross_section(
             data["dewpoint"],
@@ -766,43 +510,30 @@ def prepare_interpolated_data(
         )
     )
 
-    # --------------------------------------------------------
-    # Pressure
-    # --------------------------------------------------------
-
     pressure = np.asarray(
         data["pressure"],
         dtype=float
     )
 
     if pressure.ndim == 1:
-
-        # Common pressure levels
-        # at every station.
-
+        # Common pressure levelsat every station.
         pressure_station = np.tile(
             pressure,
             (nstation, 1)
         )
 
     elif pressure.ndim == 2:
-
         # Pressure varies by station.
-
         pressure_station = pressure
 
     else:
-
         raise ValueError(
             "Pressure must have either "
             "1 or 2 dimensions. "
             f"Got {pressure.shape}"
         )
 
-    # --------------------------------------------------------
     # Interpolate pressure horizontally
-    # --------------------------------------------------------
-
     pressure_x = (
         interpolate_cross_section(
             pressure_station,
@@ -810,10 +541,6 @@ def prepare_interpolated_data(
             x
         )
     )
-
-    # --------------------------------------------------------
-    # Create plotting grids
-    # --------------------------------------------------------
 
     X = np.tile(
         x[:, None],
@@ -824,10 +551,6 @@ def prepare_interpolated_data(
     )
 
     P = pressure_x
-
-    # --------------------------------------------------------
-    # Return
-    # --------------------------------------------------------
 
     return {
         **data,
@@ -848,64 +571,25 @@ def prepare_interpolated_data(
     }
 
 
-# ============================================================
-# CONTOUR LEVELS
-# ============================================================
+# PLOTTING
 
-def get_contour_levels(
-    values,
-    interval=5
-):
+# contours
+def get_contour_levels(values, interval=5):
     """Calculate contour levels for a field."""
 
-    vmin = (
-        np.floor(
-            np.nanmin(values)
-            /
-            interval
-        )
-        *
-        interval
-    )
+    vmin = (np.floor(np.nanmin(values)/interval) * interval)
+    vmax = (np.ceil(np.nanmax(values)/interval) * interval)
 
-    vmax = (
-        np.ceil(
-            np.nanmax(values)
-            /
-            interval
-        )
-        *
-        interval
-    )
-
-    return np.arange(
-        vmin,
-        vmax + interval,
-        interval
-    )
+    return np.arange(vmin, vmax + interval, interval)
 
 
-# ============================================================
-# TEMPERATURE
-# ============================================================
-
-def plot_temperature(
-    ax,
-    data,
-    temperature_levels
-):
+def plot_temperature(ax,data,temperature_levels):
     """
     Plot temperature-filled contours and
     temperature contour lines.
-
-    The same temperature levels are used
-    for every subplot.
     """
 
-    # --------------------------------------------------------
     # Filled contours
-    # --------------------------------------------------------
-
     cf = ax.contourf(
         data["X"],
         data["P"],
@@ -916,10 +600,7 @@ def plot_temperature(
         alpha=0.55
     )
 
-    # --------------------------------------------------------
     # Temperature lines
-    # --------------------------------------------------------
-
     temp_cs = ax.contour(
         data["X"],
         data["P"],
@@ -939,14 +620,8 @@ def plot_temperature(
     return cf
 
 
-# ============================================================
-# DEWPOINT
-# ============================================================
 
-def plot_dewpoint(
-    ax,
-    data
-):
+def plot_dewpoint(ax, data):
     """Plot dewpoint contours."""
 
     dewpoint_levels = (
@@ -972,24 +647,14 @@ def plot_dewpoint(
     )
 
 
-# ============================================================
-# WIND BARBS
-# ============================================================
-
+# wind barbs
 def plot_wind_barbs(
     ax,
     data
 ):
     """
     Plot wind barbs at selected pressure levels.
-
-    Handles both:
-
-        pressure = (height,)
-
-    and:
-
-        pressure = (station, height)
+    Handles both: pressure = (height,) and pressure = (station, height)
 
     For station-dependent pressure, the closest
     pressure level is found independently for
@@ -1026,131 +691,43 @@ def plot_wind_barbs(
     nstation = len(
         x_station
     )
-
-    # --------------------------------------------------------
-    # Storage
-    # --------------------------------------------------------
-
     barb_x = []
     barb_y = []
     barb_u = []
     barb_v = []
 
-    # ========================================================
-    # Common pressure levels
-    # ========================================================
 
     if pressure.ndim == 1:
-
         for level in requested_pressure:
+            pressure_index = np.argmin(np.abs(pressure - level))
+            actual_pressure = (pressure[pressure_index])
 
-            pressure_index = np.argmin(
-                np.abs(
-                    pressure - level
-                )
-            )
+            for station_index in range(nstation):
+                barb_x.append( x_station[station_index])
+                barb_y.append(actual_pressure)
 
-            actual_pressure = (
-                pressure[
-                    pressure_index
-                ]
-            )
+                barb_u.append(u[station_index, pressure_index])
 
-            for station_index in range(
-                nstation
-            ):
+                barb_v.append(v[station_index, pressure_index])
 
-                barb_x.append(
-                    x_station[
-                        station_index
-                    ]
-                )
-
-                barb_y.append(
-                    actual_pressure
-                )
-
-                barb_u.append(
-                    u[
-                        station_index,
-                        pressure_index
-                    ]
-                )
-
-                barb_v.append(
-                    v[
-                        station_index,
-                        pressure_index
-                    ]
-                )
-
-    # ========================================================
-    # Station-dependent pressure
-    # ========================================================
 
     elif pressure.ndim == 2:
-
-        for station_index in range(
-            nstation
-        ):
-
-            station_pressure = (
-                pressure[
-                    station_index,
-                    :
-                ]
-            )
-
+        for station_index in range(nstation):
+            station_pressure = (pressure[station_index, :])
             for level in requested_pressure:
-
-                pressure_index = np.argmin(
-                    np.abs(
-                        station_pressure
-                        -
-                        level
-                    )
-                )
-
-                actual_pressure = (
-                    station_pressure[
-                        pressure_index
-                    ]
-                )
-
-                barb_x.append(
-                    x_station[
-                        station_index
-                    ]
-                )
-
-                barb_y.append(
-                    actual_pressure
-                )
-
-                barb_u.append(
-                    u[
-                        station_index,
-                        pressure_index
-                    ]
-                )
-
-                barb_v.append(
-                    v[
-                        station_index,
-                        pressure_index
-                    ]
-                )
+                pressure_index = np.argmin(np.abs(station_pressure - level))
+                actual_pressure = (station_pressure[pressure_index])
+                barb_x.append(x_station[station_index])
+                barb_y.append(actual_pressure)
+                barb_u.append(u[station_index, pressure_index])
+                barb_v.append(v[station_index, pressure_index])
 
     else:
-
         raise ValueError(
             "Pressure must have 1 or 2 dimensions. "
             f"Got {pressure.shape}"
         )
 
-    # --------------------------------------------------------
-    # Plot
-    # --------------------------------------------------------
 
     ax.barbs(
         np.asarray(barb_x),
@@ -1163,17 +740,8 @@ def plot_wind_barbs(
     )
 
 
-# ============================================================
-# AXIS FORMATTING
-# ============================================================
-
-def format_axes(
-    ax,
-    stations,
-    x_station,
-    x_min,
-    x_max
-):
+# formatting
+def format_axes(ax, stations, x_station, x_min, x_max):
     """Configure pressure and station axes."""
 
     pressure_ticks = [
@@ -1186,24 +754,10 @@ def format_axes(
         200,
     ]
 
-    # --------------------------------------------------------
-    # Pressure axis
-    # --------------------------------------------------------
+    ax.set_yscale("log")
+    ax.set_ylim(1000, 200)
 
-    ax.set_yscale(
-        "log"
-    )
-
-    ax.set_ylim(
-        1000,
-        200
-    )
-
-    ax.yaxis.set_major_locator(
-        FixedLocator(
-            pressure_ticks
-        )
-    )
+    ax.yaxis.set_major_locator(FixedLocator(pressure_ticks))
 
     ax.yaxis.set_major_formatter(
         FixedFormatter([
@@ -1217,32 +771,11 @@ def format_axes(
         ])
     )
 
-    ax.yaxis.set_minor_formatter(
-        NullFormatter()
-    )
+    ax.yaxis.set_minor_formatter(NullFormatter())
+    ax.set_xlim(x_min, x_max)
+    ax.set_xticks(x_station)
 
-    # --------------------------------------------------------
-    # X axis
-    # --------------------------------------------------------
-
-    ax.set_xlim(
-        x_min,
-        x_max
-    )
-
-    ax.set_xticks(
-        x_station
-    )
-
-    ax.set_xticklabels(
-        stations,
-        rotation=45,
-        ha="right"
-    )
-
-    # --------------------------------------------------------
-    # Station lines
-    # --------------------------------------------------------
+    ax.set_xticklabels(stations, rotation=45, ha="right")
 
     for xpos in x_station:
 
@@ -1254,22 +787,9 @@ def format_axes(
             alpha=0.4
         )
 
-    # --------------------------------------------------------
-    # Labels
-    # --------------------------------------------------------
 
-    ax.set_xlabel(
-        "Station"
-    )
-
-    ax.set_ylabel(
-        "Pressure (hPa)"
-    )
-
-    # --------------------------------------------------------
-    # Grid
-    # --------------------------------------------------------
-
+    ax.set_xlabel("Station")
+    ax.set_ylabel("Pressure (hPa)")
     ax.grid(
         True,
         which="major",
@@ -1277,16 +797,7 @@ def format_axes(
         alpha=0.25
     )
 
-
-# ============================================================
-# LEGEND
-# ============================================================
-
-def add_legend(
-    ax
-):
-    """Add temperature/dewpoint legend."""
-
+def add_legend(ax):
     legend_lines = [
         Line2D(
             [0],
@@ -1311,10 +822,7 @@ def add_legend(
     )
 
 
-# ============================================================
-# MAIN PLOTTING FUNCTION
-# ============================================================
-
+# main function here
 def plot_cross_section(
     ds1,
     ds2,
@@ -1335,18 +843,10 @@ def plot_cross_section(
         Three datasets to plot.
 
     time : str
-        Requested valid time.
-
-        Example:
-            "2029-09-29-00z"
+        Requested valid time. E.g. "2029-09-29-00z"
 
     forecast_hour : str or int
         Forecast hour to select.
-
-        Examples:
-            "12h"
-            "24h"
-            "48h"
 
     station_order : list, optional
         Station order.
@@ -1359,26 +859,13 @@ def plot_cross_section(
 
     figsize : tuple, optional
         Figure size.
-
-    Returns
-    -------
-    fig
-        Matplotlib figure.
     """
-
-    # ========================================================
-    # Datasets
-    # ========================================================
 
     datasets = [
         ds1,
         ds2,
         ds3
     ]
-
-    # ========================================================
-    # Subplot titles
-    # ========================================================
 
     if subplot_titles is None:
 
@@ -1388,18 +875,11 @@ def plot_cross_section(
             "Dataset 3"
         ]
 
-    if len(
-        subplot_titles
-    ) != 3:
-
+    if len(subplot_titles) != 3:
         raise ValueError(
             "subplot_titles must contain "
             "exactly three titles."
         )
-
-    # ========================================================
-    # Create figure
-    # ========================================================
 
     fig, axes = plt.subplots(
         3,
@@ -1408,148 +888,37 @@ def plot_cross_section(
         sharey=True
     )
 
-    # ========================================================
-    # Process datasets
-    # ========================================================
-
     all_data = []
-
     selected_times = []
     init_times = []
 
     for ds in datasets:
+        (time_index, selected_time, init_time) = select_time(ds, time, forecast_hour)
+        selected_times.append(selected_time)
 
-        # ----------------------------------------------------
-        # Select time
-        # ----------------------------------------------------
+        init_times.append(init_time)
+        (stations, station_indices) = select_stations(ds, station_order)
 
-        (
-            time_index,
-            selected_time,
-            init_time
-        ) = select_time(
-            ds,
-            time,
-            forecast_hour
-        )
+        data = get_cross_section_data(ds, time_index, station_indices)
+        data = prepare_interpolated_data(data, len(stations))
 
-        selected_times.append(
-            selected_time
-        )
-
-        init_times.append(
-            init_time
-        )
-
-        # ----------------------------------------------------
-        # Select stations
-        # ----------------------------------------------------
-
-        (
-            stations,
-            station_indices
-        ) = select_stations(
-            ds,
-            station_order
-        )
-
-        # ----------------------------------------------------
-        # Extract data
-        # ----------------------------------------------------
-
-        data = get_cross_section_data(
-            ds,
-            time_index,
-            station_indices
-        )
-
-        # ----------------------------------------------------
-        # Interpolate
-        # ----------------------------------------------------
-
-        data = prepare_interpolated_data(
-            data,
-            len(stations)
-        )
-
-        # Store stations
+        # store stations
         data["stations"] = stations
 
-        all_data.append(
-            data
-        )
-
-    # ========================================================
-    # Common temperature levels
-    #
-    # All three datasets use exactly the same temperature
-    # color scale.
-    # ========================================================
+        all_data.append(data)
 
     all_temperature_values = np.concatenate([
-        data[
-            "temperature_x"
-        ].ravel()
-        for data in all_data
-    ])
+        data["temperature_x"].ravel()for data in all_data])
 
-    temperature_levels = (
-        get_contour_levels(
-            all_temperature_values
-        )
-    )
-
-    # ========================================================
-    # Plot each dataset
-    # ========================================================
+    temperature_levels = (get_contour_levels(all_temperature_values))
 
     contourf_objects = []
 
-    for i, (
-        ax,
-        data
-    ) in enumerate(
-        zip(
-            axes,
-            all_data
-        )
-    ):
-
-        # ----------------------------------------------------
-        # Temperature
-        # ----------------------------------------------------
-
-        cf = plot_temperature(
-            ax,
-            data,
-            temperature_levels
-        )
-
-        contourf_objects.append(
-            cf
-        )
-
-        # ----------------------------------------------------
-        # Dewpoint
-        # ----------------------------------------------------
-
-        plot_dewpoint(
-            ax,
-            data
-        )
-
-        # ----------------------------------------------------
-        # Wind
-        # ----------------------------------------------------
-
-        plot_wind_barbs(
-            ax,
-            data
-        )
-
-        # ----------------------------------------------------
-        # Axis formatting
-        # ----------------------------------------------------
+    for i, (ax, data) in enumerate(zip(axes, all_data)):
+        cf = plot_temperature(ax, data, temperature_levels)
+        contourf_objects.append(cf)
+        plot_dewpoint(ax, data)
+        plot_wind_barbs(ax, data)
 
         format_axes(
             ax,
@@ -1559,31 +928,11 @@ def plot_cross_section(
             data["x_max"]
         )
 
-        # ----------------------------------------------------
-        # Time strings
-        # ----------------------------------------------------
+        init_time_string = (format_time(init_times[i]))
 
-        init_time_string = (
-            format_time(
-                init_times[i]
-            )
-        )
+        selected_time_string = (format_time(selected_times[i]))
 
-        selected_time_string = (
-            format_time(
-                selected_times[i]
-            )
-        )
-
-        forecast_hour_string = (
-            normalize_forecast_hour(
-                forecast_hour
-            )
-        )
-
-        # ----------------------------------------------------
-        # Dataset-specific title
-        # ----------------------------------------------------
+        forecast_hour_string = (normalize_forecast_hour(forecast_hour))
 
         ax.set_title(
             f"{subplot_titles[i]}\n"
@@ -1591,18 +940,7 @@ def plot_cross_section(
             f"Forecast: {forecast_hour_string} | "
             f"Valid: {selected_time_string}"
         )
-
-        # ----------------------------------------------------
-        # Legend
-        # ----------------------------------------------------
-
-        add_legend(
-            ax
-        )
-
-    # ========================================================
-    # Shared colorbar
-    # ========================================================
+        add_legend(ax)
 
     fig.subplots_adjust(
         right=0.88,
@@ -1626,10 +964,6 @@ def plot_cross_section(
         "Temperature (°C)"
     )
 
-    # ========================================================
-    # Overall title
-    # ========================================================
-
     if title is not None:
 
         fig.suptitle(
@@ -1637,10 +971,6 @@ def plot_cross_section(
             fontsize=16,
             y=0.995
         )
-
-    # ========================================================
-    # Layout
-    # ========================================================
 
     plt.tight_layout(
         rect=(

@@ -16,8 +16,8 @@ gfs = xr.open_dataset(BASE_PATH / "GFS" / "gfs.radiosondes.profiles.level1.nc")
 ifs = xr.open_dataset(BASE_PATH / "IFS" / "ifs.radiosondes.profiles.level1.nc")
 icon = xr.open_dataset(BASE_PATH / "ICON" / "icon.radiosondes.profiles.level1.nc")
 
-cycles = ["00","06","12","18"]
-forecast = ["12h", "24h", "48h"]
+cycles = ["00"]#,"06","12","18"]
+forecast = ["12h"]#, "24h", "48h"]
 for i in forecast:
     for j in cycles:
         time = f"2026-08-15-{j}z"

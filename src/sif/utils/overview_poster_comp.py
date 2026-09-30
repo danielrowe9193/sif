@@ -143,6 +143,14 @@ def main():
     gfs_f24h = mod_fxxh(gfs, "24h", launch_times)
     gfs_f48h = mod_fxxh(gfs, "48h", launch_times)
 
+    # Load the ICON.
+    icon = load_ds('icon.radiosondes.profiles.level1.nc').sel(station='Fehmarn')
+
+    icon_f12h = icon_fxxh(icon, "12h", launch_times)
+    icon_f24h = icon_fxxh(icon, "24h", launch_times)
+    icon_f48h = icon_fxxh(icon, "48h", launch_times)
+    
+
     # Stability indices to plot.
     indices = [
         "k_index",

@@ -7,7 +7,6 @@ from metpy.calc import dewpoint_from_specific_humidity
 from matplotlib.ticker import NullFormatter, FixedLocator, FixedFormatter
 from matplotlib.lines import Line2D
 
-
 def parse_time(time):
     """
     Convert YYYY-MM-DD-HHz to numpy.datetime64.
@@ -489,50 +488,6 @@ def get_cross_section_data(
     )
 
     # =========================================================
-    # RELATIVE HUMIDITY
-    # =========================================================
-
-    r = ds["r"].isel(
-        valid_time=time_index,
-        station=station_indices
-    ).values
-
-    r = np.asarray(
-        r,
-        dtype=float
-    )
-
-
-    # =========================================================
-    # POTENTIAL TEMPERATURE
-    # =========================================================
-
-    theta = ds["theta"].isel(
-        valid_time=time_index,
-        station=station_indices
-    ).values
-
-    theta = np.asarray(
-        theta,
-        dtype=float
-    )
-
-
-    # =========================================================
-    # WET-BULB POTENTIAL TEMPERATURE
-    # =========================================================
-
-    theta_w = ds["theta_w"].isel(
-        valid_time=time_index,
-        station=station_indices
-    ).values
-
-    theta_w = np.asarray(
-        theta_w,
-        dtype=float
-    )
-
-    # =========================================================
     # Print diagnostic shapes
     # =========================================================
 
@@ -568,21 +523,6 @@ def get_cross_section_data(
     print(
         "V wind:         ",
         v.shape
-    )
-
-    print(
-        "Relative humid: ",
-        r.shape
-    )
-
-    print(
-        "Theta:          ",
-        theta.shape
-    )
-
-    print(
-        "Theta_w:        ",
-        theta_w.shape
     )
 
     # =========================================================
@@ -723,14 +663,13 @@ def get_cross_section_data(
 
     return {
         "pressure": pressure,
+
         "temperature": temperature,
+
         "dewpoint": dewpoint,
 
-        "relative_humidity": r,
-        "theta": theta,
-        "theta_w": theta_w,
-
         "u": u,
+
         "v": v,
     }
 
@@ -827,23 +766,6 @@ def prepare_interpolated_data(
         )
     )
 
-    relative_humidity_x = interpolate_cross_section(
-        data["relative_humidity"],
-        x_station,
-        x
-    )
-
-    theta_x = interpolate_cross_section(
-        data["theta"],
-        x_station,
-        x
-    )
-
-    theta_w_x = interpolate_cross_section(
-        data["theta_w"],
-        x_station,
-        x
-    )
     # --------------------------------------------------------
     # Pressure
     # --------------------------------------------------------
@@ -923,10 +845,6 @@ def prepare_interpolated_data(
 
         "temperature_x": temperature_x,
         "dewpoint_x": dewpoint_x,
-
-        "relative_humidity_x": relative_humidity_x,
-        "theta_x": theta_x,
-        "theta_w_x": theta_w_x,
     }
 
 
@@ -1621,34 +1539,7 @@ def plot_cross_section(
         )
 
         # ----------------------------------------------------
-        # Relative humidity
-        # ----------------------------------------------------
-
-        plot_relative_humidity(
-            ax,
-            data
-        )
-
-        # ----------------------------------------------------
-        # Potential temperature
-        # ----------------------------------------------------
-
-        plot_theta(
-            ax,
-            data
-        )
-
-        # ----------------------------------------------------
-        # Wet-bulb potential temperature
-        # ----------------------------------------------------
-
-        plot_theta_w(
-            ax,
-            data
-        )
-
-        # ----------------------------------------------------
-        # Wind barbs
+        # Wind
         # ----------------------------------------------------
 
         plot_wind_barbs(
@@ -1672,16 +1563,22 @@ def plot_cross_section(
         # Time strings
         # ----------------------------------------------------
 
-        init_time_string = format_time(
-            init_times[i]
+        init_time_string = (
+            format_time(
+                init_times[i]
+            )
         )
 
-        selected_time_string = format_time(
-            selected_times[i]
+        selected_time_string = (
+            format_time(
+                selected_times[i]
+            )
         )
 
-        forecast_hour_string = normalize_forecast_hour(
-            forecast_hour
+        forecast_hour_string = (
+            normalize_forecast_hour(
+                forecast_hour
+            )
         )
 
         # ----------------------------------------------------
@@ -1707,12 +1604,22 @@ def plot_cross_section(
     # Shared colorbar
     # ========================================================
 
+    fig.subplots_adjust(
+        right=0.88,
+        hspace=0.35
+    )
+
+    cbar_ax = fig.add_axes([
+        0.90,
+        0.12,
+        0.02,
+        0.76
+    ])
+
     cbar = fig.colorbar(
         contourf_objects[0],
-        ax=axes,
-        orientation="vertical",
-        pad=0.02,
-        fraction=0.025
+        cax=cbar_ax,
+        orientation="vertical"
     )
 
     cbar.set_label(
@@ -1739,10 +1646,9 @@ def plot_cross_section(
         rect=(
             0,
             0,
-            1,
+            0.88,
             0.98
         )
     )
 
     return fig
-

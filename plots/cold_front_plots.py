@@ -1,5 +1,5 @@
 import xarray as xr
-from plotting import plot_cross_section
+from plotting_all_models import plot_cross_section
 
 from pathlib import Path
 # Cold front dates: 2026-08-15
@@ -14,13 +14,14 @@ igra = xr.open_dataset(BASE_PATH / "igra" / "sif.igra_radiosondes.profiles.level
 # load model data
 gfs = xr.open_dataset(BASE_PATH / "GFS" / "gfs.radiosondes.profiles.level1.nc")
 ifs = xr.open_dataset(BASE_PATH / "IFS" / "ifs.radiosondes.profiles.level1.nc")
-
+icon = xr.open_dataset(BASE_PATH / "ICON" / "icon.radiosondes.profiles.level1.nc")
 
 cycles = ["00","06","12","18"]
-for i in cycles:
-    time = f"2026-08-15T{i}:00:00.000000000"
-    gfs_plot = plot_cross_section(gfs, time, station_order=["Norderney","Schleswig", "Fehmarn", "Greifswald"], title="GFS")
-    gfs_plot.savefig(f"figures/gfs/gfs_2026-08-15T{i}.png", dpi=300, bbox_inches="tight")
-    ifs_plot = plot_cross_section(ifs, time, station_order=["Norderney","Schleswig", "Fehmarn", "Greifswald"], title="IFS")
-    ifs_plot.savefig(f"figures/ifs/ifs_2026-08-15T{i}.png", dpi=300, bbox_inches="tight")
-
+forecast = ["12h", "24h", "48h"]
+for i in forecast:
+    for j in cycles:
+        time = f"2026-08-15-{j}z"
+        plots = plot_cross_section(ifs, gfs, icon, time, i, station_order=["Norderney","Schleswig", "Fehmarn", "Greifswald"], title="Atmospheric Cross Sections", subplot_titles=[
+        "IFS", "GFS", "ICON"])
+        plots.savefig(f"figures/models_2026-08-15-{j}_{i}.png", dpi=300, bbox_inches="tight")
+        

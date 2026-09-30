@@ -161,9 +161,9 @@ def main():
 
     # Forecast datasets.
     forecast_datasets = {
-        "12 Hour Forecast": (ifs_f12h, gfs_f12h),
-        "24 Hour Forecast": (ifs_f24h, gfs_f24h),
-        "48 Hour Forecast": (ifs_f48h, gfs_f48h),
+        "12 Hour Forecast": (ifs_f12h, gfs_f12h, icon_f12h),
+        "24 Hour Forecast": (ifs_f24h, gfs_f24h, icon_f24h),
+        "48 Hour Forecast": (ifs_f48h, gfs_f48h, icon_f48h),
     }
 
 

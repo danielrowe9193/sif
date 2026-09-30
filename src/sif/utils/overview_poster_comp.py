@@ -68,9 +68,9 @@ def main():
     # Y-axis limits for each stability index.
     y_limits = {
         "k_index": (-15, 40),
-        "ri": (16, 33),
-        "ji": (None, None),
-        "li": (0, 16),
+        "ri": (14, 35),
+        "ji": (0, 40),
+        "li": (0, 20),
     }
 
 

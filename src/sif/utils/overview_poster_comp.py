@@ -28,6 +28,58 @@ def mod_fxxh(model: xr.Dataset, forecast_hour: str, times: np.ndarray) -> xr.Dat
     return ds
 
 
+def icon_fxxh(
+    model: xr.Dataset,
+    forecast_hour: str,
+    times: np.ndarray
+) -> xr.Dataset:
+    """Select the ICON data for a loaded ICON dataset for the chosen forecast hour with an array containing the desired times."""
+
+    # Select the requested forecast hour
+    model = model.sel(
+        forecast_hour=forecast_hour,
+        drop=True,
+    )
+
+    selected = []
+
+    for time in times:
+
+        # Convert launch time to a date
+        launch_date = time.astype("datetime64[D]").astype(object)
+
+        # Select all ICON data for that date
+        ds = model.where(
+            model.valid_time.dt.date == launch_date,
+            drop=True,
+        )
+
+        # Find the valid time closest to the launch time
+        time_difference = np.abs(
+            ds.valid_time.values - time
+        )
+
+        index = time_difference.argmin()
+
+        # Select by position to avoid duplicate valid_time problems
+        ds = ds.isel(valid_time=index)
+
+        selected.append(ds)
+
+    # Combine the individual launch-time selections
+    ds = xr.concat(
+        selected,
+        dim="sounding_num",
+    )
+
+    # Preserve the original sounding numbering
+    ds = ds.assign_coords(
+        sounding_num=np.arange(len(times))
+    )
+
+    return ds
+
+
 def calculate_stats(
     observation: np.ndarray,
     model: np.ndarray,

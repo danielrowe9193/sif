@@ -20,6 +20,11 @@ fehmarn = ds.sel(station=station_name, p=slice(None, 70))
 launch_times = fehmarn.launch_time.values
 sounding_nums = fehmarn.sounding_num.values
 
+
+# Load ERA5.
+era5 = load_ds('era5.radiosondes.profiles.level1.nc')
+
+
 # Load the IFS.
 ifs_dataset = 'ifs.radiosondes.profiles.level1.nc'
 ifs = load_ds(ifs_dataset).sel(station=station_name)
@@ -41,15 +46,18 @@ gfs_f48h = mod_fxxh(gfs, "48h", launch_times)
 # Common pressure levels.
 common_p = fehmarn.p.values
 
-for ds in [ifs_f12h, ifs_f24h, ifs_f48h, gfs_f12h, gfs_f24h, gfs_f48h]:
+for ds in [era5, ifs_f12h, ifs_f24h, ifs_f48h, gfs_f12h, gfs_f24h, gfs_f48h]:
     common_p = np.intersect1d(common_p, ds.p.values)
 
 
 # Model and forecast datasets.
-models = ["GFS", "IFS"]
-forecast_hours = ["12h", "24h", "48h"]
+models = ["ERA5", "GFS", "IFS"]
+lead_times = ["00h", "12h", "24h", "48h"]
 
 forecast_datasets = {
+    "ERA5": {
+        "00h": era5,
+    },
     "GFS": {
         "12h": gfs_f12h,
         "24h": gfs_f24h,
@@ -66,7 +74,7 @@ forecast_datasets = {
 # Initialize empty arrays.
 shape = (
     len(models),
-    len(forecast_hours),
+    len(lead_times),
     len(common_p),
 )
 
@@ -87,7 +95,12 @@ n_td = np.zeros(shape, dtype=int)
 # Calculate statistics.
 for i, model_name in enumerate(models):
 
-    for j, forecast_hour in enumerate(forecast_hours):
+    for j, forecast_hour in enumerate(lead_times):
+
+        # ERA5 only has a 00h entry.
+        # GFS and IFS have 12h, 24h, and 48h entries.
+        if forecast_hour not in forecast_datasets[model_name]:
+            continue
 
         model_ds = forecast_datasets[model_name][forecast_hour]
 
@@ -132,7 +145,7 @@ for i, model_name in enumerate(models):
 stats_ds = xr.Dataset(
     {
         "ta_r2": (
-            ("model", "forecast_hour", "p"),
+            ("model", "lead_time", "p"),
             ta_r2,
             {
                 "long_name": "Temperature coefficient of determination",
@@ -144,7 +157,7 @@ stats_ds = xr.Dataset(
             },
         ),
         "ta_rmse": (
-            ("model", "forecast_hour", "p"),
+            ("model", "lead_time", "p"),
             ta_rmse,
             {
                 "long_name": "Temperature root mean square error",
@@ -156,7 +169,7 @@ stats_ds = xr.Dataset(
             },
         ),
         "ta_bias": (
-            ("model", "forecast_hour", "p"),
+            ("model", "lead_time", "p"),
             ta_bias,
             {
                 "long_name": "Temperature bias",
@@ -167,7 +180,7 @@ stats_ds = xr.Dataset(
             },
         ),
         "ta_mae": (
-            ("model", "forecast_hour", "p"),
+            ("model", "lead_time", "p"),
             ta_mae,
             {
                 "long_name": "Temperature mean absolute error",
@@ -179,7 +192,7 @@ stats_ds = xr.Dataset(
             },
         ),
         "td_r2": (
-            ("model", "forecast_hour", "p"),
+            ("model", "lead_time", "p"),
             td_r2,
             {
                 "long_name": "Dewpoint coefficient of determination",
@@ -191,7 +204,7 @@ stats_ds = xr.Dataset(
             },
         ),
         "td_rmse": (
-            ("model", "forecast_hour", "p"),
+            ("model", "lead_time", "p"),
             td_rmse,
             {
                 "long_name": "Dewpoint root mean square error",
@@ -203,7 +216,7 @@ stats_ds = xr.Dataset(
             },
         ),
         "td_bias": (
-            ("model", "forecast_hour", "p"),
+            ("model", "lead_time", "p"),
             td_bias,
             {
                 "long_name": "Dewpoint bias",
@@ -214,7 +227,7 @@ stats_ds = xr.Dataset(
             },
         ),
         "td_mae": (
-            ("model", "forecast_hour", "p"),
+            ("model", "lead_time", "p"),
             td_mae,
             {
                 "long_name": "Dewpoint mean absolute error",
@@ -226,7 +239,7 @@ stats_ds = xr.Dataset(
             },
         ),
         "n_ta": (
-            ("model", "forecast_hour", "p"),
+            ("model", "lead_time", "p"),
             n_ta,
             {
                 "long_name": "Number of valid temperature pairs",
@@ -238,7 +251,7 @@ stats_ds = xr.Dataset(
             },
         ),
         "n_td": (
-            ("model", "forecast_hour", "p"),
+            ("model", "lead_time", "p"),
             n_td,
             {
                 "long_name": "Number of valid dewpoint pairs",
@@ -258,9 +271,9 @@ stats_ds = xr.Dataset(
                 "long_name": "Numerical weather prediction model",
             },
         ),
-        "forecast_hour": (
-            "forecast_hour",
-            forecast_hours,
+        "lead_time": (
+            "lead_time",
+            lead_times,
             {
                 "long_name": "Forecast lead time",
             },
@@ -278,21 +291,23 @@ stats_ds = xr.Dataset(
     attrs={
         "title": f"{station_name} Radiosonde Model Verification Statistics",
         "description": (
-            "Statistical comparison of IFS and GFS model temperature "
-            f"and dewpoint against {station_name} radiosonde observations "
-            "for 12-hour, 24-hour, and 48-hour forecasts."
+            "Statistical comparison of ERA5, IFS, and GFS model temperature "
+            f"and dewpoint against {station_name} radiosonde observations. ERA5 is "
+            "ncluded at 00h, while IFS and GFS are included at 12h, 24h, "
+            "and 48h forecast lead times."
         ),
         "station": f'{station_name}',
         "reference_dataset": (
             f"{ref_dataset}"
         ),
         "model_datasets": (
+            "era5.radiosondes.profiles.level1.nc; "
             f"{ifs_dataset}; "
             f"{gfs_dataset}"
         ),
-        "models": "GFS; IFS",
-        "forecast_hours": "12h; 24h; 48h",
-        "statistics": "R2; RMSE; bias; MAE; sample size",
+        "models": "ERA5; GFS; IFS",
+        "lead_times": "00h; 12h; 24h; 48h",
+        "statistics": "R²; RMSE; bias; MAE; sample size",
         "temperature_variable": "ta",
         "dewpoint_variable": "td",
         "date_start": pd.to_datetime(launch_times.min()).strftime("%B %d, %Y %H:%M"),

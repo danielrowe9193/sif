@@ -1,8 +1,7 @@
+import src.sif.models.forecast_radiosondes as fr
+import src.sif.utils.file_management as fm
 import src.sif.utils.plot as plot
 import src.sif.observations.radiosondes as rs
-
-from src.sif.models import forecast_radiosondes
-from src.sif.utils.utils import FileManagement as fm
 
 # Rename files so there are sorted by date.
 fm.rename_mwx(fm.MWX_DIR)
@@ -11,18 +10,15 @@ fm.rename_mwx(fm.MWX_DIR)
 radiosondes_pipeline = rs.RadiosondePipeline(
     mwx_dir=fm.MWX_DIR
 )
-radiosondes_pipeline.run_ptu_pipeline()
-radiosondes_pipeline.run_std_plvl_pipeline()
+radiosondes_pipeline.run_sif_ptu_pipeline()
+radiosondes_pipeline.run_sif_std_plvl_pipeline()
+radiosondes_pipeline.run_igra_pipeline()
 
-# Create IFS level-0 and level-1 datasets
-ifs_level_zero = forecast_radiosondes.IFSLevelZero()
-# ifs_level_zero.collect_fc_file_paths()
-# ifs_level_zero.build_ifs_level_zero_ds()
-# ifs_level_zero.export_ifs_level_zero_ds()
-
-ifs_level_one = forecast_radiosondes.IFSLevelOne(ifs_level_zero)
-# ifs_level_one.build_ifs_level_one_ds()
-# ifs_level_one.export_ifs_level_one_ds()
+# Build level 0 to level 1 datasets for forecast data.
+forecast_radiosondes_pipeline = fr.ForecastRadiosondePipeline()
+forecast_radiosondes_pipeline.run_ifs_pipeline()
+forecast_radiosondes_pipeline.run_gfs_pipeline()
+forecast_radiosondes_pipeline.run_icon_pipeline()
 
 # Plot skew-t for each radiosonde
 profile_plotter = plot.FehmarnRadiosondeProfilePlotter(

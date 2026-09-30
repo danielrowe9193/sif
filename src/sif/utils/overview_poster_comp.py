@@ -1,0 +1,299 @@
+from pathlib import Path
+
+import matplotlib.dates as mdates
+import matplotlib.pyplot as plt
+import numpy as np
+import xarray as xr
+from sklearn.metrics import r2_score, root_mean_squared_error
+
+from src.sif.utils.file_management import NETCDF_DIR, PLOT_DIR
+
+
+def load_ds(filename: str):
+    """Load the netcdf file into a xr.Dataset from its filename."""
+    path = NETCDF_DIR / Path(filename)
+    ds = xr.open_dataset(path)
+    return ds
+
+
+def mod_fxxh(model: xr.Dataset, forecast_hour: str, times: np.ndarray) -> xr.Dataset:
+    """Load the given model data for the given forecast hour for the given times."""
+    ds = (
+        model
+        .where(model.forecast_hour == forecast_hour, drop=True)
+        .sortby("valid_time")
+        .sel(valid_time=times, method='nearest')
+    )
+
+    return ds
+
+
+def calculate_stats(
+    observation: np.ndarray,
+    model: np.ndarray,
+) -> dict:
+    """Calculate statistics between observations and model values."""
+
+    observation = np.asarray(observation)
+    model = np.asarray(model)
+
+    # Remove pairs where either observation or model is NaN.
+    valid = np.isfinite(observation) & np.isfinite(model)
+
+    observation = observation[valid]
+    model = model[valid]
+
+    stats = {
+        "R²": r2_score(observation, model),
+        "RMSE": root_mean_squared_error(observation, model),
+        "Bias": np.mean(model - observation),
+    }
+
+    return stats
+
+
+def main():
+    global m
+    # Load the Fehmarn radiosonde dataset and select the launch times.
+    fehmarn = load_ds('sif.std_plvl_radiosondes.profiles.level2.nc').sel(station='Fehmarn')
+    launch_times = fehmarn.launch_time.values
+    sounding_nums = fehmarn.sounding_num.values
+
+    # Date/time labels for the x-axis.
+    tick_labels = [
+        mdates.num2date(mdates.date2num(time)).strftime(format="%d %HZ")
+        for time in launch_times[sounding_nums]
+    ]
+
+    # Y-axis limits for each stability index.
+    y_limits = {
+        "k_index": (-15, 40),
+        "ri": (16, 33),
+        "ji": (None, None),
+        "li": (0, 16),
+    }
+
+
+    # Load ERA5.
+    era5 = load_ds('era5.radiosondes.profiles.level1.nc')
+
+    # Load the IFS.
+    ifs = load_ds('ifs.radiosondes.profiles.level1.nc').sel(station='Fehmarn')
+
+    ifs_f12h = mod_fxxh(ifs, "12h", launch_times)
+    ifs_f24h = mod_fxxh(ifs, "24h", launch_times)
+    ifs_f48h = mod_fxxh(ifs, "48h", launch_times)
+
+    # Load the GFS.
+    gfs = load_ds('gfs.radiosondes.profiles.level1.nc').sel(station='Fehmarn')
+
+    gfs_f12h = mod_fxxh(gfs, "12h", launch_times)
+    gfs_f24h = mod_fxxh(gfs, "24h", launch_times)
+    gfs_f48h = mod_fxxh(gfs, "48h", launch_times)
+
+    # Stability indices to plot.
+    indices = [
+        "k_index",
+        "ri",
+        "ji",
+        "li",
+    ]
+
+    # Forecast datasets.
+    forecast_datasets = {
+        "12 Hour Forecast": (ifs_f12h, gfs_f12h),
+        "24 Hour Forecast": (ifs_f24h, gfs_f24h),
+        "48 Hour Forecast": (ifs_f48h, gfs_f48h),
+    }
+
+
+    # Plotting
+    fig, axes = plt.subplots(4, 3, figsize=(28, 24), sharex=True)
+
+    # Plot each stability index.
+    for row, index in enumerate(indices):
+
+        for col, (forecast_hour, (ifs_ds, gfs_ds)) in enumerate(forecast_datasets.items()):
+
+            ax = axes[row, col]
+
+            # Fehmarn observation.
+            ax.plot(
+                sounding_nums,
+                fehmarn[index].values,
+                color="black",
+                linewidth=2,
+                marker="o",
+                label="Fehmarn",
+            )
+
+            # ERA5.
+            ax.plot(
+                sounding_nums,
+                era5[index].values,
+                color="gray",
+                linewidth=2,
+                marker="o",
+                label="ERA5",
+            )
+
+            # IFS.
+            ax.plot(
+                sounding_nums,
+                ifs_ds[index].values,
+                color="gold",
+                marker="o",
+                label="IFS",
+            )
+
+            # GFS.
+            ax.plot(
+                sounding_nums,
+                gfs_ds[index].values,
+                color="red",
+                marker="o",
+                label="GFS",
+            )
+
+            # Column title.
+            if row == 0:
+                ax.set_title(forecast_hour, fontsize=30, fontweight="bold")
+
+            # Y-axis label.
+            if col == 0:
+                ax.set_ylabel(fehmarn[index].attrs.get("long_name", index), fontsize=24)
+
+            ax.set_ylim(y_limits[index])
+
+            # X-axis label.
+            if row == len(indices) - 1:
+                ax.set_xlabel("August Launch time", fontsize=24, )
+
+            ax.set_xticks(sounding_nums)
+            ax.set_xticklabels(tick_labels, rotation=45, ha="right")
+            ax.set_xlim(sounding_nums.min(), sounding_nums.max())
+            ax.tick_params(axis="y", which="major", labelsize=20)
+            ax.tick_params(axis="x", which="major", labelsize=16)
+
+            # Compute statistics.
+            era5_stats = calculate_stats(
+                fehmarn[index].values,
+                era5[index].values,
+            )
+
+            ifs_stats = calculate_stats(
+                fehmarn[index].values,
+                ifs_ds[index].values,
+            )
+
+            gfs_stats = calculate_stats(
+                fehmarn[index].values,
+                gfs_ds[index].values,
+            )
+
+            metrics = ["R²", "RMSE", "Bias"]
+
+            stats_text_col0 = "Metric  ERA5   IFS    GFS\n" + "\n".join(
+                f"{m:<7}{era5_stats[m]:5.2f}  {ifs_stats[m]:5.2f}  {gfs_stats[m]:5.2f}"
+                for m in metrics
+            )
+
+            stats_text = "Metric   IFS    GFS\n" + "\n".join(
+                f"{m:<7}{ifs_stats[m]:5.2f}  {gfs_stats[m]:5.2f}"
+                for m in metrics
+            )
+
+            # Use the ERA5/IFS/GFS statistics only in column 1.
+            if col == 0:
+                stats_text = stats_text_col0
+                text_x = 0.35
+
+            else:
+                text_x = 0.5
+
+            if row == 0:
+                ax.text(
+                    text_x,
+                    0.30,
+                    stats_text,
+                    transform=ax.transAxes,
+                    verticalalignment="top",
+                    fontsize=22,
+                    fontfamily='monospace',
+                    bbox=dict(
+                        boxstyle="round",
+                        facecolor="white",
+                        alpha=0.8,
+                    ),
+                )
+
+            elif row == 1:
+                ax.text(
+                    text_x,
+                    0.30,
+                    stats_text,
+                    transform=ax.transAxes,
+                    verticalalignment="top",
+                    fontsize=22,
+                    fontfamily='monospace',
+                    bbox=dict(
+                        boxstyle="round",
+                        facecolor="white",
+                        alpha=0.8,
+                    ),
+                )
+
+            elif row == 2:
+                ax.text(
+                    text_x,
+                    0.30,
+                    stats_text,
+                    transform=ax.transAxes,
+                    verticalalignment="top",
+                    fontsize=22,
+                    fontfamily='monospace',
+                    bbox=dict(
+                        boxstyle="round",
+                        facecolor="white",
+                        alpha=0.8,
+                    ),
+                )
+
+            elif row == 3:
+                ax.text(
+                    text_x,
+                    0.98,
+                    stats_text,
+                    transform=ax.transAxes,
+                    verticalalignment="top",
+                    fontsize=22,
+                    fontfamily='monospace',
+                    bbox=dict(
+                        boxstyle="round",
+                        facecolor="white",
+                        alpha=0.8,
+                    ),
+                )
+
+            # Grid.
+            ax.grid(True, alpha=0.3)
+
+    # Add one legend to the figure.
+    handles, labels = axes[0, 0].get_legend_handles_labels()
+
+    fig.legend(
+        handles,
+        labels,
+        loc="lower center",
+        ncol=4,
+        fontsize=26,
+    )
+
+    fig.tight_layout(rect=[0, 0.04, 1, 1])
+
+    plt.savefig(PLOT_DIR / "stability_index_comparisons.png", dpi=300)
+    plt.show()
+
+
+if __name__ == "__main__":
+    main()

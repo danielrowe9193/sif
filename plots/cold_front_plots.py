@@ -14,14 +14,16 @@ igra = xr.open_dataset(BASE_PATH / "igra" / "sif.igra_radiosondes.profiles.level
 # load model data
 gfs = xr.open_dataset(BASE_PATH / "GFS" / "gfs.radiosondes.profiles.level1.nc")
 ifs = xr.open_dataset(BASE_PATH / "IFS" / "ifs.radiosondes.profiles.level1.nc")
-icon = xr.open_dataset(BASE_PATH / "ICON" / "icon.radiosondes.profiles.level1.nc")
+# icon = xr.open_dataset(BASE_PATH / "ICON" / "icon.radiosondes.profiles.level1.nc")
 
-cycles = ["00"]#,"06","12","18"]
-forecast = ["12h"]#, "24h", "48h"]
+cycles = ["00","06","12","18"]
+forecast = ["12h", "24h", "48h"]
 for i in forecast:
     for j in cycles:
         time = f"2026-08-15-{j}z"
-        plots = plot_cross_section(ifs, gfs, icon, time, i, station_order=["Norderney","Schleswig", "Fehmarn", "Greifswald"], title="Atmospheric Cross Sections", subplot_titles=[
-        "IFS", "GFS", "ICON"])
-        plots.savefig(f"figures/models_2026-08-15-{j}_{i}.png", dpi=300, bbox_inches="tight")
+        plots = plot_cross_section(ifs, gfs, time, i, ds3=None, station_order=["Norderney","Schleswig", "Fehmarn", "Greifswald"], title="Atmospheric Cross Sections", subplot_titles=[
+        "IFS", "GFS"], show=["temperature", "r", "theta"])#["temperature", "dewpoint", "r", "theta", "theta_w"])
+        plots.savefig(f"figures/temp_r_theta/ifs_gfs_2026-08-15-{j}_{i}.png", dpi=300, bbox_inches="tight")
+
+        # plot sif and igra
         

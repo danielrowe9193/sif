@@ -321,6 +321,37 @@ def get_cross_section_data(ds, time_index, station_indices):
         v,
         dtype=float
     )
+
+    # relative humidity
+    r = ds["r"].isel(
+        valid_time=time_index,
+        station=station_indices
+    ).values
+    r = np.asarray(
+        r,
+        dtype=float
+    )
+
+    # potential temperature
+    theta = ds["theta"].isel(
+        valid_time=time_index,
+        station=station_indices
+    ).values
+    theta = np.asarray(
+        theta,
+        dtype=float
+    )
+
+    # wet-bulb potential temperature
+    theta_w = ds["theta_w"].isel(
+        valid_time=time_index,
+        station=station_indices
+    ).values
+    theta_w = np.asarray(
+        theta_w,
+        dtype=float
+    )
+
     # print to check
     print()
     print("CROSS-SECTION DATA SHAPES")
@@ -342,7 +373,7 @@ def get_cross_section_data(ds, time_index, station_indices):
     )
 
     print(
-        "Specific humid: ",
+        "Specific humidity: ",
         q.shape
     )
 
@@ -354,6 +385,18 @@ def get_cross_section_data(ds, time_index, station_indices):
     print(
         "V wind:         ",
         v.shape
+    )
+    print(
+        " Relative humidity:         ",
+        r.shape
+    )
+    print(
+        "Potential temperature:         ",
+        theta.shape
+    )
+    print(
+        "Wet-bulb potential temperature:         ",
+        theta_w.shape
     )
 
     if vertical_dim == "p":
@@ -447,13 +490,16 @@ def get_cross_section_data(ds, time_index, station_indices):
         "pressure": pressure,
 
         "temperature": temperature,
-
         "dewpoint": dewpoint,
 
-        "u": u,
+        "r": r,
+        "theta": theta,
+        "theta_w": theta_w,
 
+        "u": u,
         "v": v,
     }
+
 
 
 # interpolating
@@ -509,6 +555,31 @@ def prepare_interpolated_data(data,nstation):
             x
         )
     )
+
+    r_x = (
+        interpolate_cross_section(
+            data["r"],
+            x_station,
+            x
+        )
+    )
+
+    theta_x = (
+        interpolate_cross_section(
+            data["theta"],
+            x_station,
+            x
+        )
+    )
+
+    theta_w_x = (
+        interpolate_cross_section(
+            data["theta_w"],
+            x_station,
+            x
+        )
+    )
+
 
     pressure = np.asarray(
         data["pressure"],
@@ -568,44 +639,141 @@ def prepare_interpolated_data(data,nstation):
 
         "temperature_x": temperature_x,
         "dewpoint_x": dewpoint_x,
+
+        "r_x": r_x,
+        "theta_x": theta_x,
+        "theta_w_x": theta_w_x,
     }
+
 
 
 # PLOTTING
 
 # contours
-def get_contour_levels(values, interval=5):
-    """Calculate contour levels for a field."""
+# def get_contour_levels(values, interval=5):
+#     """Calculate contour levels for a field."""
 
-    vmin = (np.floor(np.nanmin(values)/interval) * interval)
-    vmax = (np.ceil(np.nanmax(values)/interval) * interval)
+#     vmin = (np.floor(np.nanmin(values)/interval) * interval)
+#     vmax = (np.ceil(np.nanmax(values)/interval) * interval)
 
-    return np.arange(vmin, vmax + interval, interval)
+#     return np.arange(vmin, vmax + interval, interval)
 
 
-def plot_temperature(ax,data,temperature_levels):
+# Fixed temperature/dewpoint contour levels
+CONTOUR_LEVELS = [-45, -30, -15, 0, 15]
+COLOR_CONTOUR = [-60, -55, -50, -45, -40, -35, -30, -25, -20, -15, -10, -5, 0, 5, 10, 15, 20, 25, 30, 35, 40]
+PLOT_VARIABLES = [
+    "temperature",
+    "dewpoint",
+    "r",
+    "theta",
+    "theta_w"
+]
+R_LEVELS = [20, 40, 60, 80, 100]
+THETA_LEVELS = np.arange(250, 351, 5)
+THETA_W_LEVELS = np.arange(250, 351, 5)
+
+def plot_variable_contours(
+    ax,
+    data,
+    variable,
+    levels,
+    color,
+    linewidth=1.2,
+    linestyle="-",
+    label_fmt="%d"
+):
     """
-    Plot temperature-filled contours and
-    temperature contour lines.
+    Plot contour lines for a selected variable.
     """
 
-    # Filled contours
-    cf = ax.contourf(
+    values = data[f"{variable}_x"]
+
+    cs = ax.contour(
+        data["X"],
+        data["P"],
+        values,
+        levels=levels,
+        colors=color,
+        linewidths=linewidth,
+        linestyles=linestyle
+    )
+
+    ax.clabel(
+        cs,
+        inline=True,
+        fontsize=8,
+        fmt=label_fmt
+    )
+
+    return cs
+
+# def plot_temperature(ax, data, temperature_levels=CONTOUR_LEVELS, color_levels=COLOR_CONTOUR):
+#     """
+#     Plot filled temperature contours using color_levels
+#     and temperature contour lines using temperature_levels.
+#     """
+
+#     # Filled temperature contours
+#     cf = ax.contourf(
+#         data["X"],
+#         data["P"],
+#         data["temperature_x"],
+#         levels=color_levels,
+#         cmap="RdBu_r",
+#         extend="both",
+#         alpha=1.0 # color saturation
+#     )
+
+#     # Temperature contour lines
+#     temp_cs = ax.contour(
+#         data["X"],
+#         data["P"],
+#         data["temperature_x"],
+#         levels=temperature_levels,
+#         colors="black",
+#         linewidths=0.8
+#     )
+
+#     ax.clabel(
+#         temp_cs,
+#         inline=True,
+#         fontsize=8,
+#         fmt="%d°C"
+#     )
+
+#     return cf
+# temperature filled contour (background)
+def plot_temperature_fill(
+    ax,
+    data,
+    color_levels=COLOR_CONTOUR
+):
+    """Plot filled temperature contours."""
+
+    return ax.contourf(
         data["X"],
         data["P"],
         data["temperature_x"],
-        levels=temperature_levels,
+        levels=color_levels,
         cmap="RdBu_r",
         extend="both",
-        alpha=0.55
+        alpha=1.0
     )
 
-    # Temperature lines
+# temperature lines
+def plot_temperature_lines(
+    ax,
+    data,
+    levels=CONTOUR_LEVELS
+):
+    """Plot temperature contour lines."""
+
     temp_cs = ax.contour(
         data["X"],
         data["P"],
         data["temperature_x"],
-        levels=temperature_levels,
+        levels=levels,
         colors="black",
         linewidths=0.8
     )
@@ -617,24 +785,17 @@ def plot_temperature(ax,data,temperature_levels):
         fmt="%d°C"
     )
 
-    return cf
+    return temp_cs
 
 
-
-def plot_dewpoint(ax, data):
+def plot_dewpoint(ax, data, levels=CONTOUR_LEVELS):
     """Plot dewpoint contours."""
-
-    dewpoint_levels = (
-        get_contour_levels(
-            data["dewpoint_x"]
-        )
-    )
 
     td_cs = ax.contour(
         data["X"],
         data["P"],
         data["dewpoint_x"],
-        levels=dewpoint_levels,
+        levels=levels,
         colors="limegreen",
         linewidths=1.5
     )
@@ -644,6 +805,49 @@ def plot_dewpoint(ax, data):
         inline=True,
         fontsize=8,
         fmt="%d°C"
+    )
+
+    return td_cs
+
+def plot_relative_humidity(ax, data):
+    """Plot relative humidity contours."""
+
+    return plot_variable_contours(
+        ax,
+        data,
+        variable="r",
+        levels=R_LEVELS,
+        color="blue",
+        linewidth=1.0,
+        label_fmt="%d%%"
+    )
+
+
+def plot_theta(ax, data):
+    """Plot potential temperature contours."""
+
+    return plot_variable_contours(
+        ax,
+        data,
+        variable="theta",
+        levels=THETA_LEVELS,
+        color="purple",
+        linewidth=1.0,
+        label_fmt="%d"
+    )
+
+
+def plot_theta_w(ax, data):
+    """Plot wet-bulb potential temperature contours."""
+
+    return plot_variable_contours(
+        ax,
+        data,
+        variable="theta_w",
+        levels=THETA_W_LEVELS,
+        color="orange",
+        linewidth=1.0,
+        label_fmt="%d"
     )
 
 
@@ -797,50 +1001,97 @@ def format_axes(ax, stations, x_station, x_min, x_max):
         alpha=0.25
     )
 
-def add_legend(ax):
-    legend_lines = [
-        Line2D(
-            [0],
-            [0],
-            color="black",
-            linewidth=1.0,
-            label="Temperature (°C)"
-        ),
+def add_legend(ax, show):
+    """Add legend entries for selected variables."""
 
-        Line2D(
-            [0],
-            [0],
-            color="limegreen",
-            linewidth=1.5,
-            label="Dewpoint (°C)"
-        ),
-    ]
+    legend_lines = []
 
-    ax.legend(
-        handles=legend_lines,
-        loc="upper right"
-    )
+    if "temperature" in show:
+        legend_lines.append(
+            Line2D(
+                [0],
+                [0],
+                color="black",
+                linewidth=1.0,
+                label="Temperature (°C)"
+            )
+        )
+
+    if "dewpoint" in show:
+        legend_lines.append(
+            Line2D(
+                [0],
+                [0],
+                color="limegreen",
+                linewidth=1.5,
+                label="Dewpoint (°C)"
+            )
+        )
+
+    if "r" in show:
+        legend_lines.append(
+            Line2D(
+                [0],
+                [0],
+                color="blue",
+                linewidth=1.0,
+                label="Relative Humidity (%)"
+            )
+        )
+
+    if "theta" in show:
+        legend_lines.append(
+            Line2D(
+                [0],
+                [0],
+                color="purple",
+                linewidth=1.0,
+                label="Potential Temperature (K)"
+            )
+        )
+
+    if "theta_w" in show:
+        legend_lines.append(
+            Line2D(
+                [0],
+                [0],
+                color="orange",
+                linewidth=1.0,
+                label="Wet-bulb Potential Temperature (K)"
+            )
+        )
+
+    if legend_lines:
+        ax.legend(
+            handles=legend_lines,
+            loc="upper right"
+        )
+
 
 
 # main function here
 def plot_cross_section(
     ds1,
     ds2,
-    ds3,
     time,
     forecast_hour,
+    ds3=None,
     station_order=None,
     title=None,
     subplot_titles=None,
-    figsize=(15, 18)
+    figsize=(15, 18),
+    show=None
 ):
     """
-    Plot three atmospheric cross sections as subplots.
+    Plot two or three atmospheric cross sections as subplots.
 
     Parameters
     ----------
-    ds1, ds2, ds3 : xarray.Dataset
-        Three datasets to plot.
+    ds1, ds2 : xarray.Dataset
+        Two required datasets to plot.
+
+    ds3 : xarray.Dataset, optional
+        Third dataset to plot. If None, only two subplots are created.
 
     time : str
         Requested valid time. E.g. "2029-09-29-00z"
@@ -855,70 +1106,173 @@ def plot_cross_section(
         Overall figure title.
 
     subplot_titles : list, optional
-        Title corresponding to each dataset.
+        Titles corresponding to each dataset.
 
     figsize : tuple, optional
         Figure size.
+    show : show=[
+    "temperature",
+    "dewpoint",
+    "r",
+    "theta",
+    "theta_w"
+]
+
     """
 
-    datasets = [
-        ds1,
-        ds2,
-        ds3
-    ]
-
-    if subplot_titles is None:
-
-        subplot_titles = [
-            "Dataset 1",
-            "Dataset 2",
-            "Dataset 3"
+    if show is None:
+        show = [
+            "temperature",
+            "dewpoint"
         ]
 
-    if len(subplot_titles) != 3:
+    invalid_variables = [
+        variable
+        for variable in show
+        if variable not in PLOT_VARIABLES
+    ]
+
+    if invalid_variables:
         raise ValueError(
-            "subplot_titles must contain "
-            "exactly three titles."
+            f"Unknown plotting variables: {invalid_variables}\n"
+            f"Available variables: {PLOT_VARIABLES}"
         )
 
+    # dataset list
+    datasets = [ds1, ds2]
+
+    if ds3 is not None:
+        datasets.append(ds3)
+
+    n_datasets = len(datasets)
+
+    if subplot_titles is None:
+        subplot_titles = [
+            f"Dataset {i + 1}"
+            for i in range(n_datasets)
+        ]
+
+    if len(subplot_titles) != n_datasets:
+        raise ValueError(
+            f"subplot_titles must contain exactly "
+            f"{n_datasets} titles."
+        )
+
+    # Create the appropriate number of subplots
     fig, axes = plt.subplots(
-        3,
+        n_datasets,
         1,
         figsize=figsize,
         sharey=True
     )
+
+    # Make axes iterable when there is only one subplot
+    axes = np.atleast_1d(axes)
 
     all_data = []
     selected_times = []
     init_times = []
 
     for ds in datasets:
-        (time_index, selected_time, init_time) = select_time(ds, time, forecast_hour)
+
+        (time_index, selected_time, init_time) = (
+            select_time(ds, time, forecast_hour)
+        )
+
         selected_times.append(selected_time)
-
         init_times.append(init_time)
-        (stations, station_indices) = select_stations(ds, station_order)
 
-        data = get_cross_section_data(ds, time_index, station_indices)
-        data = prepare_interpolated_data(data, len(stations))
+        (stations, station_indices) = (
+            select_stations(ds, station_order)
+        )
 
-        # store stations
+        data = get_cross_section_data(
+            ds,
+            time_index,
+            station_indices
+        )
+
+        data = prepare_interpolated_data(
+            data,
+            len(stations)
+        )
+
+        # Store stations
         data["stations"] = stations
 
         all_data.append(data)
 
-    all_temperature_values = np.concatenate([
-        data["temperature_x"].ravel()for data in all_data])
+    # Get common temperature contour levels
+    # all_temperature_values = np.concatenate([
+    #     data["temperature_x"].ravel()
+    #     for data in all_data
+    # ])
 
-    temperature_levels = (get_contour_levels(all_temperature_values))
+    # temperature_levels = get_contour_levels(
+    #     all_temperature_values
+    # )
+    temperature_levels = CONTOUR_LEVELS
+
 
     contourf_objects = []
 
-    for i, (ax, data) in enumerate(zip(axes, all_data)):
-        cf = plot_temperature(ax, data, temperature_levels)
+    # Plot each dataset
+    for i, (ax, data) in enumerate(
+        zip(axes, all_data)
+    ):
+
+        # Temperature is always the filled background
+        cf = plot_temperature_fill(
+            ax,
+            data
+        )
+
         contourf_objects.append(cf)
-        plot_dewpoint(ax, data)
-        plot_wind_barbs(ax, data)
+
+        # Optional temperature lines
+        if "temperature" in show:
+
+            plot_temperature_lines(
+                ax,
+                data
+            )
+
+        # Optional dewpoint
+        if "dewpoint" in show:
+
+            plot_dewpoint(
+                ax,
+                data
+            )
+
+        # Optional relative humidity
+        if "r" in show:
+
+            plot_relative_humidity(
+                ax,
+                data
+            )
+
+        # Optional potential temperature
+        if "theta" in show:
+
+            plot_theta(
+                ax,
+                data
+            )
+
+        # Optional wet-bulb potential temperature
+        if "theta_w" in show:
+
+            plot_theta_w(
+                ax,
+                data
+            )
+
+        plot_wind_barbs(
+            ax,
+            data
+        )
 
         format_axes(
             ax,
@@ -928,11 +1282,17 @@ def plot_cross_section(
             data["x_max"]
         )
 
-        init_time_string = (format_time(init_times[i]))
+        init_time_string = format_time(
+            init_times[i]
+        )
 
-        selected_time_string = (format_time(selected_times[i]))
+        selected_time_string = format_time(
+            selected_times[i]
+        )
 
-        forecast_hour_string = (normalize_forecast_hour(forecast_hour))
+        forecast_hour_string = normalize_forecast_hour(
+            forecast_hour
+        )
 
         ax.set_title(
             f"{subplot_titles[i]}\n"
@@ -940,13 +1300,15 @@ def plot_cross_section(
             f"Forecast: {forecast_hour_string} | "
             f"Valid: {selected_time_string}"
         )
-        add_legend(ax)
+
+        add_legend(ax, show)
 
     fig.subplots_adjust(
         right=0.88,
         hspace=0.35
     )
 
+    # Colorbar
     cbar_ax = fig.add_axes([
         0.90,
         0.12,
@@ -965,7 +1327,6 @@ def plot_cross_section(
     )
 
     if title is not None:
-
         fig.suptitle(
             title,
             fontsize=16,

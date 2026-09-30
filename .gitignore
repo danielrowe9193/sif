@@ -1,5 +1,6 @@
 # Ignore data folder.
 /data
+/plots/figures
 
 # Ignore data file types anywhere.
 *.nc

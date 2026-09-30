@@ -30,9 +30,7 @@ class IFSLevelZero:
         self._ifs_ds_list = []
 
         self.dataset: None | xr.Dataset = None
-        self.dataset_filepath = (
-            fm.IFS_DIR / "ifs.radiosondes.profiles.level0.nc"
-        )
+        self.dataset_filepath = fm.IFS_DIR / "ifs.radiosondes.profiles.level0.nc"
 
     def collect_fc_file_paths(self) -> None:
         """
@@ -133,9 +131,7 @@ class IFSLevelOne:
         self.ifs_level_zero = ifs_level_zero
 
         self.dataset = xr.open_dataset(self.ifs_level_zero.dataset_filepath)
-        self.dataset_filepath = (
-            fm.IFS_DIR / "ifs.radiosondes.profiles.level1.nc"
-        )
+        self.dataset_filepath = fm.IFS_DIR / "ifs.radiosondes.profiles.level1.nc"
 
     def build_ifs_level_one_ds(self) -> None:
         """
@@ -204,9 +200,7 @@ class GFSLevelZero:
         self._gfs_ds_list = []
 
         self.dataset: None | xr.Dataset = None
-        self.dataset_filepath = (
-            fm.GFS_DIR / "gfs.radiosondes.profiles.level0.nc"
-        )
+        self.dataset_filepath = fm.GFS_DIR / "gfs.radiosondes.profiles.level0.nc"
 
     def collect_fc_file_paths(self) -> None:
         """
@@ -249,9 +243,7 @@ class GFSLevelZero:
             )
 
             # Compute initialization time
-            init_time = gfs_ds.sel(
-                forecast_hour="anl"
-            ).valid_time.values
+            init_time = gfs_ds.sel(forecast_hour="anl").valid_time.values
 
             gfs_ds = gfs_ds.assign_coords(
                 init_time=("valid_time", [init_time, init_time, init_time, init_time])
@@ -281,7 +273,7 @@ class GFSLevelZero:
         """
         self.dataset.to_netcdf(self.dataset_filepath)
         return None
-    
+
 
 class GFSLevelOne:
     """
@@ -307,9 +299,7 @@ class GFSLevelOne:
         self.gfs_level_zero = gfs_level_zero
 
         self.dataset = xr.open_dataset(self.gfs_level_zero.dataset_filepath)
-        self.dataset_filepath = (
-            fm.GFS_DIR / "gfs.radiosondes.profiles.level1.nc"
-        )
+        self.dataset_filepath = fm.GFS_DIR / "gfs.radiosondes.profiles.level1.nc"
 
     def build_gfs_level_one_ds(self) -> None:
         """
@@ -378,9 +368,7 @@ class ICONLevelZero:
         self._icon_ds_list = []
 
         self.dataset: None | xr.Dataset = None
-        self.dataset_filepath = (
-                fm.ICON_DIR / "icon.radiosondes.profiles.level0.nc"
-        )
+        self.dataset_filepath = fm.ICON_DIR / "icon.radiosondes.profiles.level0.nc"
 
     def collect_fc_file_paths(self) -> None:
         """
@@ -426,9 +414,7 @@ class ICONLevelZero:
             )
 
             # Compute initialization time
-            init_time = icon_ds.sel(
-                forecast_hour="anl"
-            ).valid_time.values
+            init_time = icon_ds.sel(forecast_hour="anl").valid_time.values
 
             icon_ds = icon_ds.assign_coords(
                 init_time=("time", [init_time, init_time, init_time, init_time])
@@ -436,13 +422,11 @@ class ICONLevelZero:
 
             # Icon stores 'rh' and 'td' on dimensions that are irrelevant to our analysis.
             # These variables are dropped
-            icon_ds = icon_ds.drop_vars(
-                ['rh', 'td', 'valid_time']
-            )
+            icon_ds = icon_ds.drop_vars(["rh", "td", "valid_time"])
 
             self._icon_ds_list.append(icon_ds)
 
-        self.dataset = xr.concat(self._icon_ds_list, dim="time", join='outer')
+        self.dataset = xr.concat(self._icon_ds_list, dim="time", join="outer")
 
         # Rename variables
         self.dataset = self.dataset.rename(
@@ -492,9 +476,7 @@ class ICONLevelOne:
         self.icon_level_zero = icon_level_zero
 
         self.dataset = xr.open_dataset(self.icon_level_zero.dataset_filepath)
-        self.dataset_filepath = (
-                fm.ICON_DIR / "icon.radiosondes.profiles.level1.nc"
-        )
+        self.dataset_filepath = fm.ICON_DIR / "icon.radiosondes.profiles.level1.nc"
 
     def build_icon_level_one_ds(self) -> None:
         """
@@ -516,16 +498,18 @@ class ICONLevelOne:
         None
         """
         # Force dimensions to be in the required order for calculations.
-        self.dataset = self.dataset.transpose("station", "valid_time", "height", "lev", "height_3")
+        self.dataset = self.dataset.transpose(
+            "station", "valid_time", "height", "lev", "height_3"
+        )
 
-        self.dataset = calc.calculate_td_from_q(self.dataset)
-        self.dataset = calc.calculate_potential_temperature(self.dataset)
-        self.dataset = calc.calculate_wet_bulb_potential_temperature(self.dataset)
-        self.dataset = calc.calculate_height_from_pressure(self.dataset)
-        self.dataset = calc.calculate_cape_cin(self.dataset)
-        self.dataset = calc.calculate_k_index(self.dataset)
-        self.dataset = calc.calculate_tt_index(self.dataset)
-        self.dataset = calc.calculate_li(self.dataset)
+        # self.dataset = calc.calculate_td_from_q(self.dataset)
+        # self.dataset = calc.calculate_potential_temperature(self.dataset)
+        # self.dataset = calc.calculate_wet_bulb_potential_temperature(self.dataset)
+        # self.dataset = calc.calculate_height_from_pressure(self.dataset)
+        # self.dataset = calc.calculate_cape_cin(self.dataset)
+        # self.dataset = calc.calculate_k_index(self.dataset)
+        # self.dataset = calc.calculate_tt_index(self.dataset)
+        # self.dataset = calc.calculate_li(self.dataset)
         # self.dataset = calc.calculate_ji(self.dataset)
         # self.dataset = calc.calculate_ri(self.dataset)
         # self.dataset = calc.calculate_pw(self.dataset)
@@ -583,16 +567,9 @@ class ForecastRadiosondePipeline:
     def run_icon_pipeline():
         """Run ICON radiosondes through Level 0 -> Level 1."""
 
-        ...
-
         lvl0 = ICONLevelZero()
         lvl0.collect_fc_file_paths()
         lvl0.build_icon_level_zero_ds()
         lvl0.export_icon_level_zero_ds()
 
-        lvl1 = ICONLevelOne(lvl0)
-        lvl1.build_icon_level_one_ds()
-        lvl1.export_gfs_level_one_ds()
-
         return None
-

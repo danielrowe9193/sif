@@ -597,19 +597,19 @@ def calculate_ji(radiosonde_dataset: xr.Dataset | xr.DataTree):
 
     theta_w_850 = radiosonde_dataset["theta_w"].sel(
         p=850, method='nearest'
-    )
+    ) - 273.15
 
     ta_500 = radiosonde_dataset['ta'].sel(
         p=500, method='nearest'
-    )
+    ) - 273.15
 
     ta_700 = radiosonde_dataset['ta'].sel(
         p=700, method='nearest'
-    )
+    ) - 273.15
 
     td_700 = radiosonde_dataset['td'].sel(
         p=700, method='nearest'
-    )
+    ) - 273.15
 
     ji = (1.6 * theta_w_850) - ta_500 - (0.5 * (ta_700 - td_700)) - eight  # ;)
 

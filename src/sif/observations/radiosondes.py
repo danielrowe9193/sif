@@ -246,7 +246,9 @@ class SIFRadiosondesLevel0:
         """Interpolate to 1000–10 hPa grid, harmonize coordinates."""
         
         ptu_radiosonde_ds_list = []
-        
+
+        radiosondes = self.radiosondes.load_all()
+
         for index, radiosonde in enumerate(self.radiosondes.iter_radiosondes()):
             ptu_radiosonde_ds = PTURadiosonde(radiosonde).build_dataset()
             ptu_radiosonde_ds = ptu_radiosonde_ds.interp(p=self.PRESSURE_GRID)

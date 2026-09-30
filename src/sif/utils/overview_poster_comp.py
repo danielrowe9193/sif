@@ -215,6 +215,16 @@ def main():
                 label="GFS",
             )
 
+            # ICON.
+            ax.plot(
+                sounding_nums,
+                icon_ds[index].values,
+                color="violet",
+                marker="o",
+                label="ICON",
+            )
+            
+
             # Column title.
             if row == 0:
                 ax.set_title(forecast_hour, fontsize=30, fontweight="bold")

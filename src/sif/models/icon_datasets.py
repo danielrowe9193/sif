@@ -213,6 +213,7 @@ q = icon1["q"].values * units("kg/kg")
 td = mpcalc.dewpoint_from_specific_humidity(pressure=p.T, specific_humidity=q.T).to(
     units.kelvin
 )
+rh = mpcalc.relative_humidity_from_specific_humidity(pressure=p.T, temperature=ta.T, specific_humidity=q.T)
 theta = mpcalc.potential_temperature(pressure=p.T, temperature=ta.T).to(units.kelvin)
 theta_w = mpcalc.wet_bulb_potential_temperature(
     pressure=p.T, temperature=ta.T, dewpoint=td
@@ -224,6 +225,15 @@ k = mpcalc.k_index(pressure=p.T, temperature=ta.T, dewpoint=td).magnitude
 tt = mpcalc.total_totals_index(pressure=p.T, temperature=ta.T, dewpoint=td).magnitude
 
 # Add computed variables to icon1 dataset
+icon1['rh'] = xr.DataArray(
+    rh.magnitude.T * 100,
+    dims=icon1['ta'].dims,
+    attrs={
+        "long_name": "Relative Humidity",
+        "units": "Percent",
+    },
+)
+
 icon1['td'] = xr.DataArray(
     td.magnitude.T,
     dims=icon1['ta'].dims,
@@ -284,5 +294,5 @@ icon1 = calculate_si(icon1)
 icon1 = calculate_ri(icon1)
 icon1 = calculate_ji(icon1)
 
-icon1.to_netcdf("/Users/danielrowe/Python/icon.radiosondes.profiles.level1.nc")
 icon1.to_netcdf(fm.ICON_DIR / "icon.radiosondes.profiles.level1.nc")
+

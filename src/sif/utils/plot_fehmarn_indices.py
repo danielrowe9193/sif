@@ -93,5 +93,33 @@ def main():
     plt.show()
 
 
+def plot_ri():
+    launch_times = ds.launch_time.values
+    sounding_nums = ds.sounding_num.values
+
+    # Date/time labels for the x-axis.
+    tick_labels = [
+        mdates.num2date(mdates.date2num(time)).strftime(format="%d %HZ")
+        for time in launch_times[sounding_nums]
+    ]
+
+    rackliff_index = ds['ri']
+
+    fig, ax = plt.subplots(figsize=(12, 10))
+
+    plot_index(rackliff_index, ax)
+
+    ax.set_xlabel("August Launch time")
+    ax.set_xticks(sounding_nums)
+    ax.set_xticklabels(tick_labels, rotation=45, ha="right")
+    ax.set_xlim(sounding_nums.min() - 0.2, sounding_nums.max() + 0.2)
+    ax.tick_params(axis="y", which="major", labelsize=20)
+    ax.tick_params(axis="x", which="major", labelsize=16)
+
+    plt.tight_layout()
+    plt.savefig(PLOT_DIR / "rackliff_index_at_fehmarn", dpi=300)
+    plt.show()
+
+
 if __name__ == "__main__":
     main()

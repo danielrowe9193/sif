@@ -21,9 +21,11 @@ forecast = ["12h", "24h", "48h"]
 for i in forecast:
     for j in cycles:
         time = f"2026-08-15-{j}z"
+        # plot models
         plots = plot_cross_section(ifs, gfs, time, i, ds3=None, station_order=["Norderney","Schleswig", "Fehmarn", "Greifswald"], title="Atmospheric Cross Sections", subplot_titles=[
         "IFS", "GFS"], show=["temperature", "r", "theta"])#["temperature", "dewpoint", "r", "theta", "theta_w"])
         plots.savefig(f"figures/temp_r_theta/ifs_gfs_2026-08-15-{j}_{i}.png", dpi=300, bbox_inches="tight")
 
         # plot sif and igra
+        
         

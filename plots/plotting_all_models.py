@@ -831,8 +831,8 @@ def plot_theta(ax, data):
         data,
         variable="theta",
         levels=THETA_LEVELS,
-        color="purple",
-        linewidth=1.0,
+        color="olive",
+        linewidth=1.5,
         label_fmt="%d"
     )
 
@@ -1044,8 +1044,8 @@ def add_legend(ax, show):
             Line2D(
                 [0],
                 [0],
-                color="purple",
-                linewidth=1.0,
+                color="olive",
+                linewidth=1.5,
                 label="Potential Temperature (K)"
             )
         )

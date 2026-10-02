@@ -1,3 +1,4 @@
+import matplotlib.dates as mdates
 from matplotlib import pyplot as plt
 import numpy as np
 
@@ -38,7 +39,7 @@ def plot_index(index, ax):
             idx,
             color=weather_colors[weather_index],
             edgecolor="black",
-            s=80,
+            s=200,
             zorder=2,
         )
 
@@ -78,14 +79,65 @@ def main():
     fig, axes = plt.subplots(3, 3, figsize=(24, 20))
 
     plot_index(k_index, axes[0, 0])
+    axes[0, 0].set_facecolor("lavenderblush")
+    axes[0, 0].set_ylim(-12, 40)
+    axes[0, 0].axhline(y=35, color="darkred", linestyle=":", linewidth=4)
+    axes[0, 0].axhline(y=30, color="red", linestyle=":", linewidth=4)
+    axes[0, 0].axhline(y=25, color="orange", linestyle=":", linewidth=4)
+    axes[0, 0].axhline(y=20, color="yellow", linestyle=":", linewidth=8)
+
     plot_index(lifted_index, axes[0, 1])
+    axes[0, 1].set_facecolor("aliceblue")
+    axes[0, 1].set_ylim(-8, 16)
+    axes[0, 1].axhline(y=-6, color="darkred", linestyle=":", linewidth=4)
+    axes[0, 1].axhline(y=-4, color="red", linestyle=":", linewidth=4)
+    axes[0, 1].axhline(y=-2, color="orange", linestyle=":", linewidth=4)
+    axes[0, 1].axhline(y=0, color="yellow", linestyle=":", linewidth=8)
+    axes[0, 1].axhline(y=3, color="green", linestyle=":", linewidth=4)
+    axes[0, 1].axhline(y=6, color="lightgreen", linestyle=":", linewidth=4)
+
     plot_index(cin, axes[0, 2])
+    axes[0, 2].set_facecolor("aliceblue")
+
     plot_index(cape, axes[1, 0])
+    axes[1, 0].set_facecolor("lavenderblush")
+
     plot_index(totals_totals_index, axes[1, 1])
+    axes[1, 1].set_facecolor("lavenderblush")
+    axes[1, 1].set_ylim(18, 60)
+    axes[1, 1].axhline(y=56, color="darkred", linestyle=":", linewidth=4)
+    axes[1, 1].axhline(y=52, color="red", linestyle=":", linewidth=4)
+    axes[1, 1].axhline(y=48, color="orange", linestyle=":", linewidth=4)
+    axes[1, 1].axhline(y=45, color="yellow", linestyle=":", linewidth=8)
+    axes[1, 1].axhline(y=42, color="green", linestyle=":", linewidth=4)
+
+
     plot_index(rackliff_index, axes[1, 2])
+    axes[1, 2].set_facecolor("lavenderblush")
+    axes[1, 2].axhline(y=32, color="darkred", linestyle=":", linewidth=4)
+    axes[1, 2].axhline(y=30, color="red", linestyle=":", linewidth=4)
+    axes[1, 2].axhline(y=29, color="orange", linestyle=":", linewidth=4)
+    axes[1, 2].axhline(y=27, color="yellow", linestyle=":", linewidth=8)
+    axes[1, 2].axhline(y=25, color="green", linestyle=":", linewidth=4)
+
     plot_index(showalter_index, axes[2, 0])
+    axes[2, 0].set_facecolor("aliceblue")
+    axes[2, 0].set_ylim(-8, 16)
+    axes[2, 0].axhline(y=-6, color="darkred", linestyle=":", linewidth=4)
+    axes[2, 0].axhline(y=-4, color="red", linestyle=":", linewidth=4)
+    axes[2, 0].axhline(y=0, color="orange", linestyle=":", linewidth=4)
+    axes[2, 0].axhline(y=3, color="yellow", linestyle=":", linewidth=8)
+
     plot_index(jefferson_index, axes[2, 1])
+    axes[2, 1].set_facecolor("lavenderblush")
+    axes[2, 1].axhline(y=30, color="darkred", linestyle=":", linewidth=4)
+    axes[2, 1].axhline(y=29, color="red", linestyle=":", linewidth=4)
+    axes[2, 1].axhline(y=28, color="orange", linestyle=":", linewidth=4)
+    axes[2, 1].axhline(y=26, color="yellow", linestyle=":", linewidth=8)
+    axes[2, 1].axhline(y=24, color="green", linestyle=":", linewidth=4)
+
     plot_index(precipitable_water, axes[2, 2])
+    axes[2, 2].set_facecolor("lavenderblush")
 
 
     plt.tight_layout()
@@ -116,10 +168,17 @@ def plot_ri():
     ax.tick_params(axis="y", which="major", labelsize=20)
     ax.tick_params(axis="x", which="major", labelsize=16)
 
+    ax.set_facecolor("lavenderblush")
+    ax.axhline(y=32, color="darkred", linestyle=":", linewidth=4)
+    ax.axhline(y=30, color="red", linestyle=":", linewidth=4)
+    ax.axhline(y=29, color="orange", linestyle=":", linewidth=4)
+    ax.axhline(y=27, color="yellow", linestyle=":", linewidth=8)
+    ax.axhline(y=25, color="green", linestyle=":", linewidth=4)
+
     plt.tight_layout()
     plt.savefig(PLOT_DIR / "rackliff_index_at_fehmarn", dpi=300)
     plt.show()
 
 
 if __name__ == "__main__":
-    main()
+    plot_ri()

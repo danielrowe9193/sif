@@ -880,15 +880,17 @@ def plot_wind_barbs(
         dtype=float
     )
 
+    knots = 1.94384 # m/s to knots
+
     u = np.asarray(
         data["u"],
         dtype=float
-    )
+    ) * knots
 
     v = np.asarray(
         data["v"],
         dtype=float
-    )
+    ) * knots
 
     x_station = data["x_station"]
 
@@ -1079,7 +1081,7 @@ def plot_cross_section(
     station_order=None,
     title=None,
     subplot_titles=None,
-    figsize=(15, 18),
+    figsize=(10, 18), # change this for figure size (horizontal, veritcal)
     show=None
 ):
     """
@@ -1298,7 +1300,8 @@ def plot_cross_section(
             f"{subplot_titles[i]}\n"
             f"Init: {init_time_string} | "
             f"Forecast: {forecast_hour_string} | "
-            f"Valid: {selected_time_string}"
+            f"Valid: {selected_time_string}",
+            fontsize=14 # fontsize for titles
         )
 
         add_legend(ax, show)
@@ -1323,7 +1326,13 @@ def plot_cross_section(
     )
 
     cbar.set_label(
-        "Temperature (°C)"
+        "Temperature (°C)",
+        fontsize=14 # fontsize for labels
+    )
+
+    # fontsize for ticks
+    cbar.ax.tick_params(
+        labelsize=12
     )
 
     if title is not None:

@@ -584,7 +584,6 @@ def soundings_to_xarray(soundings: dict[pd.Timestamp, pd.DataFrame]) -> xr.Datas
             ),
 
             # Per-sounding variables
-
             "release_time": (
                 "time",
                 release_time,

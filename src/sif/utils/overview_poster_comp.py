@@ -39,7 +39,7 @@ def icon_fxxh(
     model = model.sel(
         forecast_hour=forecast_hour,
         drop=True,
-    )
+    ).sortby("valid_time")
 
     selected = []
 
@@ -122,7 +122,7 @@ def main():
         "k_index": (-15, 40),
         "ri": (14, 35),
         "ji": (0, 40),
-        "li": (0, 20),
+        "li": (-2, 20),
     }
 
 
@@ -229,6 +229,9 @@ def main():
             if row == 0:
                 ax.set_title(forecast_hour, fontsize=30, fontweight="bold")
 
+            if (row == 0) and (col == 0):
+                ax.set_title(f"ERA5 and {forecast_hour}", fontsize=30, fontweight="bold")
+
             # Y-axis label.
             if col == 0:
                 ax.set_ylabel(fehmarn[index].attrs.get("long_name", index), fontsize=24)
@@ -269,12 +272,12 @@ def main():
             metrics = ["R²", "RMSE", "Bias"]
 
             stats_text_col0 = "Metric  ERA5   IFS   GFS  ICON\n" + "\n".join(
-                f"{m:<7}{era5_stats[m]:5.2f} {ifs_stats[m]:5.2f}  {gfs_stats[m]:4.2f} {icon_stats[m]:5.2f}"
+                f"{m:<7}{era5_stats[m]:5.2f} {ifs_stats[m]:5.2f}  {gfs_stats[m]:5.2f} {icon_stats[m]:5.2f}"
                 for m in metrics
             )
 
             stats_text = "Metric   IFS   GFS  ICON\n" + "\n".join(
-                f"{m:<7}{ifs_stats[m]:5.2f}  {gfs_stats[m]:4.2f} {icon_stats[m]:5.2f}"
+                f"{m:<7}{ifs_stats[m]:5.2f}  {gfs_stats[m]:5.2f} {icon_stats[m]:5.2f}"
                 for m in metrics
             )
 
